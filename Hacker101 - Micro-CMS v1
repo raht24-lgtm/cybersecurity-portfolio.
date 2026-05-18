@@ -1,0 +1,277 @@
+Micro-CMS v1 – Complete Beginner-Friendly Walkthrough
+Platform: Hacker101 CTF
+Challenge: Micro-CMS v1
+Difficulty: Easy
+Flags to find: 4
+Goal: Exploit multiple web vulnerabilities (IDOR, SQLi, XSS) to capture all four flags.
+
+Note: Your challenge URL will be unique. Replace <TARGET_URL> with your actual lab domain (e.g., https://xxxxx.ctf.hacker101.com/).
+
+English Version
+-Spanish version at the bottom-
+Table of Contents
+Initial Reconnaissance
+
+Flag 1 – IDOR (Insecure Direct Object Reference)
+Flag 2 – SQL Injection
+Flag 3 – Reflected XSS in Page Title
+Flag 4 – Stored XSS via HTML Events
+Summary of Findings
+Glossary for Beginners
+Tools Used
+
+1. Initial Reconnaissance
+When you start the challenge, you land on a simple homepage with three clickable links:
+
+Testing → /page/1
+Markdown Test → /page/2
+Create a new page → /page/create
+
+The "Create a new page" section states: "Markdown is supported, but scripts are not". This immediately raises questions:
+-If scripts are blocked in the content body, what about the title field?
+-How are pages numbered? Do pages 3–6 exist but are hidden?
+
+Open your browser's Developer Tools (F12) and inspect the page source — no immediate secrets, but the URL patterns reveal a structure: page/[id] and page/edit/[id].
+
+2. Flag 1 – IDOR (Insecure Direct Object Reference)
+What is IDOR?
+IDOR (Insecure Direct Object Reference) occurs when an application exposes internal object references (like file names or database keys) without proper access control checks. Attackers can manipulate these references to access unauthorized data.
+
+Exploitation Steps:
+Create a new page to see how IDs are assigned:
+
+Fill in a Title (e.g., "test") and Content (e.g., "hello world").
+
+Click Create.
+
+After creation, you're redirected to /page/7 (or a similar number, often 7 or 8).
+
+Spot the anomaly: The two default pages are 1 and 2, yet your new page got ID 7.
+-This suggests that pages 3, 4, 5, and 6 exist but are not linked from the homepage.
+
+Enumerate hidden pages by manually changing the ID in the URL:
+
+Try /page/3 → 404 Not Found
+Try /page/4 → 404 Not Found
+Try /page/5 → 403 Forbidden (the page exists but you lack direct view access)
+Try /page/6 → 404 Not Found
+
+Access the restricted page via the edit endpoint:
+Since you discovered that /page/5 gives a 403, try its edit counterpart:
+/page/edit/5
+
+Expected Result: The edit page loads, and Flag 1 is displayed on the screen.
+
+3. Flag 2 – SQL Injection
+What is SQL Injection (SQLi)?
+SQL Injection is a code injection technique that exploits vulnerabilities in an application's database query. By inserting special characters (like a single quote '), an attacker can alter the query's logic, potentially retrieving sensitive data.
+
+Exploitation Steps:
+Navigate to any editable page (e.g., /page/edit/1).
+
+In the URL, append a single quote (') to the page ID:
+
+/page/edit/1'.
+
+Observe the result: the page loads a flag instead of showing an error message.
+(This happens because the application fails to sanitize the input, and the quote breaks the SQL query, returning unexpected results.).
+
+4. Flag 3 – Reflected XSS in Page Title
+What is Reflected XSS?
+Reflected Cross‑Site Scripting (XSS) occurs when user‑supplied input is immediately returned by the server without proper sanitization and then executed in the user's browser. The malicious script is "reflected" off the web server.
+
+Exploitation Steps:
+Go to the "Create a new page" form.
+
+Notice the warning: "Markdown is supported, but scripts are not" – this applies to the content body, but no restriction is mentioned for the title field.
+
+In the Title field, inject a simple <script> payload:
+
+<script>alert(1)</script>
+
+Keep the Content field harmless (e.g., "test").
+
+Click Create and then Go Home.
+
+On the homepage, the title of your new page is rendered – and the script executes, showing a popup. The flag appears in the alert (or as a popup text).
+
+5. Flag 4 – Stored XSS via HTML Events
+What is Stored (Persistent) XSS?
+Stored XSS occurs when a malicious script is permanently stored on the target server (e.g., in a database) and later served to users without proper sanitization. It's more dangerous than reflected XSS because every visitor sees the malicious content.
+
+Exploitation Steps:
+Click on the "Markdown Test" page (/page/2) and then click "Edit this page".
+
+The content area is filtered: <script> tags are blocked. However, HTML event handlers (like onclick, onmouseover, onerror) are often not sanitized.
+
+Enter the following payload into the content body:
+
+html
+<img src=1 onerror=alert(1)>
+(This attempts to load an image that will fail, triggering the onerror event and executing the JavaScript.)
+
+Click Save, then view the page.
+
+The flag may not pop up immediately – inspect the page source (right‑click → View Source). The flag is often hidden in the generated HTML comments or as an attribute value.
+
+6. Summary of Findings (English)
+Flag	Vulnerability Type	Attack Vector	Result
+Flag 1	IDOR (Insecure Direct Object Reference)	Access /page/edit/5 after noticing ID gap	Flag displayed on /page/edit/5
+Flag 2	SQL Injection	Append a single quote to URL: /page/edit/1'	Flag loads instead of error page
+Flag 3	Reflected XSS	Inject <script> in page title during creation	Flag in alert popup on homepage
+Flag 4	Stored XSS (HTML Events)	Inject <img src=1 onerror=alert(1)> in content	Flag hidden in page source after execution
+7. Glossary for Beginners (English)
+IDOR (Insecure Direct Object Reference): Manipulating object identifiers (e.g., page IDs) to access unauthorized resources.
+
+SQL Injection (SQLi): Inserting malicious SQL code into a query to manipulate the database.
+XSS (Cross‑Site Scripting): Injecting malicious scripts into trusted websites.
+Reflected XSS: Script is reflected off the server in an immediate response (e.g., in search results).
+Stored (Persistent) XSS: Script is permanently stored on the server and served to all users (e.g., in a comment).
+Event Handler: JavaScript code that runs in response to user actions (like clicking or mousing over an element). Examples: onclick, onmouseover, onerror.
+URL Manipulation: Changing parameters in the URL (like page numbers) to test for vulnerabilities.
+
+8. Tools Used (English)
+Browser (Firefox/Chrome): View source, test payloads, navigate manually.
+
+Developer Tools (F12): Inspect elements, check console for errors.
+
+Burp Suite / OWASP ZAP (optional): Intercept and modify requests (not required for this lab).
+
+ES - Versión en Español
+Micro-CMS v1 – Guía Detallada Paso a Paso para Principiantes
+Plataforma: Hacker101 CTF
+Laboratorio: Micro-CMS v1
+Dificultad: Fácil
+Banderas (flags) a encontrar: 4
+Objetivo: Explotar múltiples vulnerabilidades web (IDOR, SQLi, XSS) para capturar las cuatro flags.
+
+Nota: Tu URL del laboratorio será única. Reemplaza <TARGET_URL> con tu dominio real (ej. https://xxxxx.ctf.hacker101.com/).
+
+Tabla de Contenidos
+Reconocimiento Inicial
+
+Flag 1 – IDOR (Insecure Direct Object Reference)
+Flag 2 – Inyección SQL
+Flag 3 – XSS Reflejado en el Título
+Flag 4 – XSS Almacenado con Eventos HTML
+Resumen de Hallazgos
+Glosario para Principiantes
+Herramientas Utilizadas
+
+1. Reconocimiento Inicial
+Al iniciar el laboratorio, te encuentras con una página de inicio simple con tres enlaces:
+
+Testing → /page/1
+
+Markdown Test → /page/2
+
+Create a new page → /page/create
+
+La sección "Create a new page" indica: "Markdown is supported, but scripts are not". Esto genera preguntas:
+-Si los scripts están bloqueados en el contenido, ¿qué pasa con el título?
+-¿Cómo se numeran las páginas? ¿Existen las páginas 3–6 pero están ocultas?
+
+Abre las Herramientas de Desarrollador (F12) e inspecciona el código fuente – no hay secretos inmediatos, pero los patrones de URL revelan una estructura: page/[id] y page/edit/[id].
+
+2. Flag 1 – IDOR (Insecure Direct Object Reference)
+Qué es IDOR?
+IDOR ocurre cuando una aplicación expone referencias internas (como IDs de páginas) sin controles de acceso adecuados. Los atacantes pueden manipular estas referencias para acceder a datos no autorizados.
+
+Pasos de Explotación:
+Crea una nueva página para ver cómo se asignan los IDs:
+
+Escribe un Título (ej. "test") y Contenido (ej. "hola mundo").
+
+Haz clic en Create.
+
+Después de la creación, serás redirigido a /page/7 (o un número similar, a menudo 7 u 8).
+
+Detecta la anomalía: Las dos páginas por defecto son 1 y 2, pero tu nueva página obtuvo el ID 7.
+-Esto sugiere que las páginas 3, 4, 5 y 6 existen pero no están enlazadas desde el inicio.
+
+Enumera páginas ocultas cambiando manualmente el ID en la URL:
+
+Prueba /page/3 → 404 Not Found
+Prueba /page/4 → 404 Not Found
+Prueba /page/5 → 403 Forbidden (la página existe pero no tienes acceso directo)
+Prueba /page/6 → 404 Not Found
+Accede a la página restringida mediante el endpoint de edición:
+Dado que /page/5 devuelve 403, prueba su contraparte de edición:
+/page/edit/5
+
+Resultado esperado: La página de edición se carga y Flag 1 se muestra en la pantalla.
+
+3. Flag 2 – Inyección SQL
+Qué es Inyección SQL (SQLi)?
+SQLi es una técnica que explota vulnerabilidades en consultas de bases de datos. Al insertar caracteres especiales (como una comilla simple '), un atacante puede alterar la lógica de la consulta y potencialmente recuperar datos sensibles.
+
+Pasos de Explotación:
+Navega a cualquier página editable (ej. /page/edit/1).
+
+En la URL, añade una comilla simple (') al final del ID de página:
+
+/page/edit/1'.
+
+Observa el resultado: la página carga una bandera (flag) en lugar de mostrar un mensaje de error.
+(Esto ocurre porque la aplicación no sanitiza la entrada, y la comilla rompe la consulta SQL, devolviendo resultados inesperados.)
+
+4. Flag 3 – XSS Reflejado en el Título
+Qué es XSS Reflejado?
+XSS Reflejado ocurre cuando la entrada del usuario es devuelta inmediatamente por el servidor sin una sanitización adecuada y se ejecuta en el navegador del usuario. El script malicioso se "refleja" en el servidor web.
+
+Pasos de Explotación:
+Ve al formulario "Create a new page".
+
+Observa la advertencia: "Markdown is supported, but scripts are not" – esto aplica al contenido, pero no hay restricción mencionada para el título.
+
+En el campo Título, inyecta un payload simple de <script>:
+
+<script>alert(1)</script>
+
+Mantén el Contenido inofensivo (ej. "test").
+
+Haz clic en Create y luego en Go Home.
+
+En la página de inicio, el título de tu nueva página se renderiza – y el script se ejecuta, mostrando una ventana emergente. La flag aparece en la alerta (o como texto de la ventana emergente).
+
+5. Flag 4 – XSS Almacenado con Eventos HTML
+Qué es XSS Almacenado (Persistente)?
+El XSS Almacenado ocurre cuando un script malicioso se almacena permanentemente en el servidor (ej. en una base de datos) y luego se sirve a los usuarios sin sanitización. Es más peligroso que el XSS reflejado porque cada visitante ve el contenido malicioso.
+
+Pasos de Explotación:
+Haz clic en la página "Markdown Test" (/page/2) y luego en "Edit this page".
+
+El área de contenido está filtrada: las etiquetas <script> están bloqueadas. Sin embargo, los manejadores de eventos HTML (como onclick, onmouseover, onerror) a menudo no se sanitizan.
+
+Introduce el siguiente payload en el cuerpo del contenido:
+
+html
+<img src=1 onerror=alert(1)>
+(Esto intenta cargar una imagen que fallará, activando el evento onerror y ejecutando JavaScript.)
+
+Haz clic en Save y luego visualiza la página.
+
+La flag puede no aparecer inmediatamente – inspecciona el código fuente (clic derecho → Ver código fuente). La flag suele estar oculta en comentarios HTML generados o como un valor de atributo.
+
+6. Resumen de Hallazgos (Español)
+Flag	Tipo de Vulnerabilidad	Vector de Ataque	Resultado
+Flag 1	IDOR (Referencia Directa Insegura)	Acceder a /page/edit/5 tras detectar el salto de ID	Flag mostrada en /page/edit/5
+Flag 2	Inyección SQL	Añadir una comilla simple en la URL: /page/edit/1'	Flag se carga en lugar de página de error
+Flag 3	XSS Reflejado	Inyectar <script> en el título al crear página	Flag en alerta emergente en el inicio
+Flag 4	XSS Almacenado (Eventos HTML)	Inyectar <img src=1 onerror=alert(1)> en contenido	Flag oculta en el código fuente tras ejecución
+7. Glosario para Principiantes (Español)
+IDOR (Referencia Directa Insegura): Manipular identificadores de objetos (ej. IDs de página) para acceder a recursos no autorizados.
+
+Inyección SQL (SQLi): Insertar código SQL malicioso en una consulta para manipular la base de datos.
+XSS (Cross‑Site Scripting): Inyectar scripts maliciosos en sitios web confiables.
+XSS Reflejado: El script se refleja en el servidor en una respuesta inmediata (ej. en resultados de búsqueda).
+XSS Almacenado (Persistente): El script se almacena permanentemente en el servidor y se sirve a todos los usuarios (ej. en un comentario).
+Manejador de Eventos: Código JavaScript que se ejecuta en respuesta a acciones del usuario (como hacer clic o pasar el ratón sobre un elemento). Ejemplos: onclick, onmouseover, onerror.
+Manipulación de URL: Cambiar parámetros en la URL (como números de página) para probar vulnerabilidades.
+
+8. Herramientas Utilizadas (Español)
+Navegador (Firefox/Chrome): Ver fuente, probar payloads, navegar manualmente.
+Herramientas de Desarrollador (F12): Inspeccionar elementos, ver consola para errores.
+Burp Suite / OWASP ZAP (opcional): Interceptar y modificar solicitudes (no necesario para este laboratorio).
+
+¡Felicidades! Has completado Micro-CMS v1 y aprendido técnicas reales de pentesting web: IDOR, SQLi y XSS. Recuerda siempre practicar solo en entornos autorizados.
