@@ -1,0 +1,347 @@
+Hacker101: Postbook – Complete Beginner-Friendly Walkthrough
+Platform: Hacker101 CTF
+Challenge: Postbook
+Difficulty: Easy
+Total Flags: 7
+Primary Skills: Parameter tampering (IDOR), Burp Suite, MD5 hash manipulation, client-side modification, Postman (optional)
+
+English Version
+Table of Contents
+Initial Setup (Registration & Exploration)
+
+Flag 0 – The user Account's Simple Password
+Flag 1 – Accessing a Hidden Post by Altering the id Parameter
+Flag 2 – Creating a Post as Another User via Client-Side Tampering
+Flag 3 – The ID 945 (189 * 5)
+Flag 4 – Editing Someone Else's Post
+Flag 5 – Hijacking the user Account via MD5 Cookies
+Flag 6 – Deleting a Post with MD5 ID Values
+Summary of Findings (English)
+Glossary for Beginners (English)
+Tools Used (English)
+
+1. Initial Setup (Registration & Exploration)
+1.1 Start the Challenge:
+Click Start on the Postbook challenge. This will open a new web application in your browser.
+
+1.2 Register a New Account:
+On the homepage, click Sign up. Create a new user with the credentials of your choice (for example: mytestuser / mytestpass).
+
+1.3 Log In:
+After registering, use your new credentials to log in.
+
+1.4 Explore the Dashboard:
+Once logged in, you are taken to your personal dashboard. Key areas to notice are:
+
+Write a new post: A form to create new blog entries.
+
+Posts: Existing public posts from other accounts (e.g., user and admin) are visible here.
+
+Edit & Delete options: Available for your own posts.
+
+1.5 Key Observation #1 – Cookie:
+Open your browser's developer tools and navigate to the Application tab (Chrome/Edge) or Storage tab (Firefox). Under Cookies, you'll find a cookie named id with a value that looks like a hash. This is a critical finding.
+
+1.6 Key Observation #2 – URL Structure:
+When you click on a post, the URL includes the parameter page=view.php and id=N, where N is a number. Example: index.php?page=view.php&id=3.
+
+2. Flag 0 – The user Account's Simple Password
+Hint: "The person with username “user” has a very easy password"
+
+Vulnerability: Weak password (brute‑force not required – it's just the word password).
+
+2.1 Log Out of your current session.
+
+2.2 Attempt to log in with the following credentials:
+
+Username: user
+
+Password: password
+
+2.3 Result: You are logged in, and Flag 0 is immediately displayed on the screen.
+
+3. Flag 1 – Accessing a Hidden Post by Altering the id Parameter
+Hint: "Try viewing your own post and then see if you can change the ID"
+
+Vulnerability: IDOR (Insecure Direct Object Reference) – the application does not verify if the user has permission to view a given post.
+
+3.1 While logged in, create a new test post with some dummy content (do not mark it as private). After publishing, note the id value in the URL. For example: index.php?page=view.php&id=3
+
+3.2 Change the id parameter in the address bar from 3 to 2. The URL now becomes: index.php?page=view.php&id=2
+
+3.3 Hit Enter to load the page.
+
+3.4 Result: You can view the post with id=2, which belongs to another user. This displays Flag 1.
+
+4. Flag 2 – Creating a Post as Another User via Client-Side Tampering
+Hint: "You should definitely use 'Inspect Element' on the form when creating a new post"
+
+Vulnerability: Lack of server-side validation of the user_id when creating a post (client-side trust).
+
+4.1 Navigate to the "Write a new post" form.
+
+4.2 Open Developer Tools (F12) and inspect the HTML form. Look for an <input> field named user_id.
+
+4.3 Change its value attribute from your current user's ID (e.g., 3) to 1.
+
+4.4 Fill in the title and content as usual and submit the form.
+
+4.5 Result: The post is created as if it were submitted by user_id = 1, which corresponds to the admin user. Flag 2 is displayed.
+
+5. Flag 3 – The ID 945 (189 * 5)
+Hint: *"189 * 5"*
+
+Vulnerability: Predictable ID enumeration.
+
+5.1 Multiply 189 by 5 to get the number 945.
+
+5.2 In the address bar, navigate to: index.php?page=view.php&id=945
+
+5.3 Result: The page loads a post and reveals Flag 3.
+
+6. Flag 4 – Editing Someone Else's Post
+Hint: "You can edit your own posts, what about someone else’s?"
+
+Vulnerability: IDOR in the edit function.
+
+6.1 From your dashboard, click the "Edit" button next to one of your own posts. Take note of the URL: index.php?page=edit.php&id=3 (the number will vary).
+
+6.2 Change the id parameter in the address bar to 2.
+
+6.3 You are now on the edit page of the post belonging to another user. Make a trivial change (e.g., add a space) and click Save.
+
+6.4 Result: The application allows you to edit and save the post, and Flag 4 is displayed.
+
+7. Flag 5 – Hijacking the user Account via MD5 Cookies
+Hint: "The cookie allows you to stay signed in. Can you figure out how they work so you can sign in to user with ID 1?"
+
+Vulnerability: Predictable cookie generation using MD5 hashes.
+
+7.1 Check your current id cookie in Developer Tools → Application → Cookies. The value will be something like c81e728d9d4c2f636f067f89cc14862c.
+
+7.2 Use an online MD5 reverse lookup tool (e.g., md5.gromweb.com) to see what number this hash corresponds to. You will find that the hash represents the number 2.
+
+7.3 Calculate the MD5 hash of the number 1 using an online tool, the command line (echo -n 1 | md5sum), or a scripting language.
+
+7.4 Replace your current cookie value with this new MD5 hash (of the number 1).
+
+7.5 Refresh the page. The application will now believe you are the user with id = 1 (the admin account), and Flag 5 will appear.
+
+8. Flag 6 – Deleting a Post with MD5 ID Values
+Hint: "Deleting a post seems to take an ID that is not a number. Can you figure out what it is?"
+
+Vulnerability: IDOR in the delete function, using MD5 hashes for IDs.
+
+8.1 From your dashboard, click the "Delete" button next to one of your posts. Observe the URL: index.php?page=delete.php&id=MD5_HASH_VALUE.
+
+8.2 The id value is not a plain number; it's an MD5 hash. Determine which post ID it corresponds to by using an MD5 reverse lookup tool, or by hashing a few small integers (1, 2, 3, 4...) until you get a match.
+
+8.3 Once you know the mapping, generate the MD5 hash of the target post ID you want to delete (for example, the one belonging to another user).
+
+8.4 Modify the URL by replacing the id parameter value with this new hash.
+
+8.5 Press Enter. The other user's post will be deleted, and Flag 6 will be displayed.
+
+9. Summary of Findings (English)
+Flag	Vulnerability	Attack Vector	How to Trigger
+0	Weak password	user / password login	Direct login attempt
+1	IDOR (view)	Change id parameter in URL from 3 to 2	index.php?page=view.php&id=2
+2	Client-side trust (user_id)	Modify hidden form field user_id from 3 to 1	Inspect element, change value, submit
+3	Predictable ID enumeration	ID 945 (189 * 5)	index.php?page=view.php&id=945
+4	IDOR (edit)	Change id in edit.php from 3 to 2	index.php?page=edit.php&id=2 → edit → save
+5	Predictable cookie generation (MD5)	Replace id cookie's MD5 hash of 2 with hash of 1	Use MD5(1) as cookie value
+6	IDOR (delete) + MD5 ID values	Replace MD5 hash in delete link with hash of another ID	index.php?page=delete.php&id=MD5(target_id)
+10. Glossary for Beginners (English)
+
+IDOR (Insecure Direct Object Reference): A vulnerability that occurs when an application exposes an internal object reference (like a file, database key, or post ID) without proper access control checks. Attackers can manipulate these references to access unauthorized data.
+IDOM (Insecure Direct Object Manipulation): A broader term that encompasses IDOR and similar object manipulation flaws.
+Parameter Tampering: Manually modifying parameters in URLs, form fields, or cookies to change the application's behavior.
+MD5: A cryptographic hash function that produces a 128-bit (32-character hexadecimal) hash. It is no longer considered secure for cryptographic purposes and can often be reversed for short inputs.
+MD5 Hash: The output of the MD5 algorithm. Example: c81e728d9d4c2f636f067f89cc14862c is the MD5 hash of the string 2.
+Hash Reversal (Reverse Lookup): Using an online database to find an input that produces a given hash. This works because the input space (small numbers) is limited.
+Burp Suite: An integrated platform for performing security testing of web applications. It can intercept and modify HTTP requests.
+Client‑Side vs. Server‑Side Validation: Client‑side validation happens in the browser (e.g., via JavaScript) and can be bypassed. Server‑side validation happens on the web server and is more secure.
+Cookie: A small piece of data stored by the user's browser that websites use to remember stateful information (such as logged‑in user identity).
+
+11. Tools Used (English)
+Tool	Purpose
+Browser (Chrome/Firefox/Edge)	Main interface, developer tools, cookie manipulation, URL navigation.
+Developer Tools (F12)	Inspect elements, modify hidden form fields, view/edit cookies, examine network traffic.
+Burp Suite (Community Edition)	Optional but helpful for intercepting and replaying requests, especially for Flags 2 and 5.
+Online MD5 Reverse Lookup	Decode MD5 hashes back to plain numbers. Recommended: https://md5.gromweb.com/.
+Command Line (echo -n 1 | md5sum)	Generate MD5 hashes locally.
+
+
+ES - Versión en Español
+Hacker101: Postbook – Guía Detallada Paso a Paso para Principiantes
+Plataforma: Hacker101 CTF
+Laboratorio: Postbook
+Dificultad: Fácil
+Número de banderas (flags): 7
+Habilidades principales: Manipulación de parámetros (IDOR), Burp Suite, manipulación de hashes MD5, modificación en el cliente, Postman (opcional)
+
+Tabla de Contenidos
+Configuración Inicial (Registro y Exploración)
+
+Flag 0 – La Contraseña Simple de la Cuenta user
+Flag 1 – Acceder a una Entrada Oculta Cambiando el Parámetro id
+Flag 2 – Crear una Entrada como Otro Usuario Manipulando el Cliente
+Flag 3 – El ID 945 (189 * 5)
+Flag 4 – Editar una Entrada de Otro Usuario
+Flag 5 – Secuestrar la Cuenta user Mediante Cookies MD5
+Flag 6 – Eliminar una Entrada con Valores ID en MD5
+Resumen de Hallazgos (Español)
+Glosario para Principiantes (Español)
+Herramientas Utilizadas (Español)
+
+1. Configuración Inicial (Registro y Exploración) – Español
+1.1 Iniciar el Laboratorio:
+Haz clic en Start en el laboratorio Postbook. Se abrirá una aplicación web en tu navegador.
+
+1.2 Registrar una Cuenta Nueva:
+En la página de inicio, haz clic en Sign up. Crea un nuevo usuario con las credenciales que prefieras (por ejemplo: mytestuser / mytestpass).
+
+1.3 Iniciar Sesión:
+Después de registrarte, usa tus nuevas credenciales para iniciar sesión.
+
+1.4 Explorar el Panel de Control:
+Una vez dentro, tu panel personal mostrará:
+
+Write a new post: Formulario para crear nuevas entradas.
+
+Posts: Entradas públicas de otras cuentas (por ejemplo, user y admin).
+
+Edit & Delete: Opciones disponibles para tus propias entradas.
+
+1.5 Observación Clave #1 – Cookie:
+Abre las herramientas de desarrollador (F12) y ve a la pestaña Application (Chrome/Edge) o Storage (Firefox). En Cookies, encontrarás una cookie llamada id cuyo valor parece un hash. Esto es crítico.
+
+1.6 Observación Clave #2 – Estructura de la URL:
+Al hacer clic en una entrada, la URL incluye los parámetros page=view.php y id=N, donde N es un número. Ejemplo: index.php?page=view.php&id=3.
+
+2. Flag 0 – La Contraseña Simple de la Cuenta user – Español
+Pista: "The person with username “user” has a very easy password"
+
+Vulnerabilidad: Contraseña débil (no se necesita fuerza bruta, es simplemente la palabra password).
+
+2.1 Cierra sesión de tu cuenta actual.
+
+2.2 Intenta iniciar sesión con las siguientes credenciales:
+
+Usuario: user
+
+Contraseña: password
+
+2.3 Resultado: Inicias sesión y Flag 0 se muestra inmediatamente en la pantalla.
+
+3. Flag 1 – Acceder a una Entrada Oculta Cambiando el Parámetro id – Español
+Pista: "Try viewing your own post and then see if you can change the ID"
+
+Vulnerabilidad: IDOR (Insecure Direct Object Reference) – la aplicación no verifica si el usuario tiene permiso para ver una entrada determinada.
+
+3.1 Estando conectado, crea una entrada de prueba con contenido de relleno. Después de publicarla, anota el valor de id en la URL. Por ejemplo: index.php?page=view.php&id=3
+
+3.2 Cambia el parámetro id en la barra de direcciones de 3 a 2. La URL será: index.php?page=view.php&id=2
+
+3.3 Presiona Enter para cargar la página.
+
+3.4 Resultado: Puedes ver la entrada con id=2, que pertenece a otro usuario. Esto muestra Flag 1.
+
+4. Flag 2 – Crear una Entrada como Otro Usuario Manipulando el Cliente – Español
+Pista: "You should definitely use 'Inspect Element' on the form when creating a new post"
+
+Vulnerabilidad: Falta de validación en el servidor del campo user_id al crear una entrada (se confía en el cliente).
+
+4.1 Ve al formulario "Write a new post".
+
+4.2 Abre las herramientas de desarrollador (F12) e inspecciona el formulario HTML. Busca un campo <input> llamado user_id.
+
+4.3 Cambia su atributo value de tu ID actual (por ejemplo 3) a 1.
+
+4.4 Completa el título y el contenido como siempre y envía el formulario.
+
+4.5 Resultado: La entrada se crea como si la hubiera enviado user_id = 1 (el usuario admin). Flag 2 es mostrada.
+
+5. Flag 3 – El ID 945 (189 * 5) – Español
+Pista: *"189 * 5"*
+
+Vulnerabilidad: Enumeración de IDs predecibles.
+
+5.1 Multiplica 189 por 5 para obtener el número 945.
+
+5.2 En la barra de direcciones, navega a: index.php?page=view.php&id=945
+
+5.3 Resultado: La página carga una entrada y revela Flag 3.
+
+6. Flag 4 – Editar una Entrada de Otro Usuario – Español
+Pista: "You can edit your own posts, what about someone else’s?"
+
+Vulnerabilidad: IDOR en la función de edición.
+
+6.1 Desde tu panel, haz clic en el botón "Edit" de una de tus entradas. Anota la URL: index.php?page=edit.php&id=3 (el número variará).
+
+6.2 Cambia el parámetro id en la barra de direcciones a 2.
+
+6.3 Ahora estás en la página de edición de la entrada de otro usuario. Haz un cambio trivial (por ejemplo, añade un espacio) y haz clic en Save.
+
+6.4 Resultado: La aplicación permite editar y guardar la entrada, y se muestra Flag 4.
+
+7. Flag 5 – Secuestrar la Cuenta user Mediante Cookies MD5 – Español
+Pista: "The cookie allows you to stay signed in. Can you figure out how they work so you can sign in to user with ID 1?"
+
+Vulnerabilidad: Generación predecible de cookies usando hashes MD5.
+
+7.1 Revisa tu cookie id actual en Herramientas de Desarrollador → Application → Cookies. El valor será algo como c81e728d9d4c2f636f067f89cc14862c.
+
+7.2 Usa una herramienta de búsqueda inversa de MD5 (por ejemplo, md5.gromweb.com) para ver qué número corresponde a ese hash. Verás que representa al número 2.
+
+7.3 Calcula el hash MD5 del número 1 usando una herramienta en línea, la línea de comandos (echo -n 1 | md5sum) o un lenguaje de script.
+
+7.4 Reemplaza el valor de tu cookie actual con este nuevo hash MD5 (el del número 1).
+
+7.5 Refresca la página. La aplicación creerá que eres el usuario con id = 1 (la cuenta admin), y Flag 5 aparecerá.
+
+8. Flag 6 – Eliminar una Entrada con Valores ID en MD5 – Español
+Pista: "Deleting a post seems to take an ID that is not a number. Can you figure out what it is?"
+
+Vulnerabilidad: IDOR en la función de eliminación, usando hashes MD5 como IDs.
+
+8.1 Desde tu panel, haz clic en el botón "Delete" de una de tus entradas. Observa la URL: index.php?page=delete.php&id=VALOR_MD5.
+
+8.2 El valor de id no es un número plano; es un hash MD5. Determina a qué ID de entrada corresponde usando una herramienta de búsqueda inversa de MD5, o hasheando pequeños números enteros (1, 2, 3, 4...) hasta encontrar una coincidencia.
+
+8.3 Una vez que sepas la correspondencia, genera el hash MD5 del ID de la entrada objetivo que quieras eliminar (por ejemplo, la de otro usuario).
+
+8.4 Modifica la URL reemplazando el valor del parámetro id por este nuevo hash.
+
+8.5 Presiona Enter. La entrada del otro usuario se eliminará y se mostrará Flag 6.
+
+9. Resumen de Hallazgos (Español)
+Flag	Vulnerabilidad	Vector de Ataque	Cómo activarlo
+0	Contraseña débil	Inicio de sesión user / password	Intentar iniciar sesión directamente
+1	IDOR (visualización)	Cambiar id en la URL de 3 a 2	index.php?page=view.php&id=2
+2	Confianza en el cliente (user_id)	Modificar campo oculto user_id de 3 a 1	Inspeccionar elemento, cambiar valor, enviar
+3	Enumeración de IDs predecibles	ID 945 (189 * 5)	index.php?page=view.php&id=945
+4	IDOR (edición)	Cambiar id en edit.php de 3 a 2	index.php?page=edit.php&id=2 → editar → guardar
+5	Generación predecible de cookies (MD5)	Reemplazar cookie id (MD5 de 2) por MD5 de 1	Usar MD5(1) como valor de cookie
+6	IDOR (eliminación) + IDs en MD5	Reemplazar hash MD5 en el enlace de eliminar	index.php?page=delete.php&id=MD5(id_objetivo)
+10. Glosario para Principiantes (Español)
+
+IDOR (Referencia Directa a Objetos No Segura): Vulnerabilidad que ocurre cuando una aplicación expone una referencia a un objeto interno (como un archivo, una clave de base de datos o un ID de publicación) sin los controles de acceso adecuados. Los atacantes pueden manipular estas referencias para acceder a datos no autorizados.
+IDOM (Manipulación Directa de Objetos No Segura): Un término más amplio que abarca IDOR y otras fallas similares de manipulación de objetos.
+Manipulación de Parámetros: Modificación manual de parámetros en URLs, campos de formularios o cookies para cambiar el comportamiento de la aplicación.
+MD5: Una función hash criptográfica que produce un hash de 128 bits (32 caracteres hexadecimales). Ya no se considera segura para fines criptográficos y a menudo puede revertirse para entradas cortas.
+Hash MD5: El resultado del algoritmo MD5. Ejemplo: c81e728d9d4c2f636f067f89cc14862c es el hash MD5 de la cadena 2.
+Reversión de Hash (Búsqueda Inversa): Uso de una base de datos en línea para encontrar una entrada que produzca un hash determinado. Esto funciona porque el espacio de entrada (números pequeños) es limitado.
+Burp Suite: Una plataforma integrada para realizar pruebas de seguridad en aplicaciones web. Puede interceptar y modificar solicitudes HTTP.
+Validación del lado del cliente vs. del lado del servidor: La validación del lado del cliente ocurre en el navegador (por ejemplo, mediante JavaScript) y se puede eludir. La validación del lado del servidor ocurre en el servidor web y es más segura.
+Cookie: Un pequeño fragmento de datos almacenado por el navegador del usuario que los sitios web utilizan para recordar información de estado (como la identidad del usuario que ha iniciado sesión).
+
+11. Herramientas Utilizadas (Español)
+Herramienta	Propósito
+Navegador (Chrome/Firefox/Edge)	Interfaz principal, herramientas de desarrollador, manipulación de cookies, navegación por URL.
+Herramientas de Desarrollador (F12)	Inspeccionar elementos, modificar campos de formulario ocultos, ver/editar cookies, examinar tráfico de red.
+Burp Suite (Community Edition)	Opcional pero útil para interceptar y reproducir solicitudes, especialmente para las Flags 2 y 5.
+Búsqueda Inversa de MD5 en línea	Decodificar hashes MD5 a números planos. Recomendado: https://md5.gromweb.com/.
+Línea de comandos (echo -n 1 | md5sum)	Generar hashes MD5 localmente.
+¡Felicidades! Has completado Postbook y has aprendido conceptos fundamentales de seguridad web: IDOR, confianza excesiva en el cliente, enumeración de parámetros y riesgos del uso de hashes débiles como MD5. Recuerda siempre practicar solo en entornos autorizados.
