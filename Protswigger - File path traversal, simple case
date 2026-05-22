@@ -1,0 +1,232 @@
+Write-up: File path traversal, simple case - PortSwigger
+What is this lab about?
+The "File path traversal, simple case" lab is designed to teach you a very common and dangerous vulnerability called Path Traversal (also known as Directory Traversal).
+
+In plain English: Path traversal happens when a web application allows an attacker to read files that are not supposed to be accessible. Examples include sensitive operating system files or application secrets. In this lab, your goal is to read the /etc/passwd file of the server. This file contains information about all the users on that Linux system.
+
+The lab simulates a simple online shop. Product images are loaded dynamically using a URL parameter, like this:
+
+https://your-lab.net/image?filename=10.jpg
+
+The problem is that the application does not check whether filename really points to an image file. If you change it to something like ../../../etc/passwd, the server will obediently read and return that system file.
+
+Step-by-step solution
+What you will need
+Burp Suite Community Edition – a free web security testing tool. You can download it from portswigger.net/burp/communitydownload.
+
+A web browser with the FoxyProxy extension (or you can manually configure your browser to use Burp's proxy).
+
+The lab link – PortSwigger gives you a unique URL when you start the lab.
+
+Step 1 – Understanding the request
+Access the lab – click the lab link in your browser. Make sure Burp is running and your browser is sending traffic through Burp.
+
+Intercept a request – click on any product, for example a jacket, to see its details page. Now look for the product image. Right-click on the image and select "Open image in new tab".
+
+Look at the URL of that new tab. It will look something like this:
+https://your-lab.net/image?filename=42.jpg
+
+What this means:
+
+The /image endpoint expects a parameter named filename.
+The value of that parameter is the name of the image file.
+The server then reads that file from a folder (probably something like /var/www/images/) and sends it back to you.
+
+Step 2 – Sending the request to Burp Repeater
+In Burp Suite, go to the "Proxy" tab and then the "HTTP history" sub-tab.
+
+Find the request that fetches the image. It will be a GET /image?filename=42.jpg entry.
+
+Right-click on it and choose "Send to Repeater".
+
+What is Repeater? Repeater is a tool inside Burp that lets you manually modify a request and send it repeatedly to the server. It is perfect for testing things like path traversal.
+
+Step 3 – Modifying the filename
+In Burp, go to the "Repeater" tab.
+
+You will see the request you just sent:
+
+
+GET /image?filename=42.jpg HTTP/1.1
+Host: your-lab.net
+...
+Change the value of filename to:
+
+
+../../../etc/passwd
+So the request becomes:
+
+
+GET /image?filename=../../../etc/passwd HTTP/1.1
+...
+Click the "Send" button at the top of the Repeater window.
+
+Step 4 – Observing the result
+Look at the "Response" section. In most cases, you will see a lot of text that looks like this:
+
+
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+...
+carlos:x:1000:1000:Carlos,,,:/home/carlos:/bin/bash
+Congratulations! You have successfully retrieved the /etc/passwd file. The lab will automatically mark itself as solved.
+
+Why does this work?
+Let us break down the payload:
+
+../../../etc/passwd
+
+.. means "go up one directory".
+
+/ separates directory names (on Linux/Unix systems).
+
+etc/passwd is the full path to the password file on a typical Linux system.
+
+The server expects your filename parameter to point to something inside /var/www/images/. By adding ../, you are telling the server:
+Go up from /var/www/images/ to /var/www/ (first ..)
+Go up again to /var/ (second ..)
+Go up again to / (third ..)
+Now from the root, go to etc/passwd
+
+The server happily does exactly that because there is no check that the file must be an image. The result: you read /etc/passwd.
+
+Findings
+Finding 1: Path Traversal vulnerability
+The /image endpoint does not validate or sanitise the filename parameter.
+
+Finding 2: No restriction on file type
+The application reads any file the server process has access to, not only images.
+
+Finding 3: Linux file system exposed
+The presence of /etc/passwd in the response confirms the server is a Linux/Unix system and that the attack succeeded.
+
+Finding 4: Impact
+With path traversal, an attacker could read sensitive files such as application configuration files, source code, or other system files.
+
+How to prevent this in real applications
+If you are a developer, here is how to stop path traversal attacks:
+Use a whitelist of allowed files. Instead of accepting any filename, map a user-friendly identifier (for example img42) to a concrete file on disk. If the identifier is not in the list, reject the request.
+Sanitise user input. Remove or reject any .., /, \ or other directory-traversal sequences.
+Use a secure API that does not allow path traversal. For example, in Java, use getResource instead of constructing raw file paths. In Python, use os.path.abspath to check that the final path is still inside the intended directory.
+Run the application with the least privileges. If the web server runs as a low-privileged user, even a successful path traversal may not expose critical system files.
+Do not rely on client-side checks. Never trust that the user will send only valid filenames. All validation must be done on the server.
+
+Key takeaways
+Path traversal is one of the simplest but most dangerous vulnerabilities. A few ../ can turn a harmless image viewer into a file disclosure weapon.
+Always inspect how parameters are used. If you see a filename parameter, test for traversal sequences.
+The Length or Status column in Burp Intruder is not always needed. Sometimes the most effective test is just changing one value and sending it with Repeater.
+Practice is essential. This lab is the beginning of a whole series on path traversal (blocked sequences, URL-encoding bypasses, null-byte bypasses, and more).
+
+Write-up (Español): File path traversal, simple case PortSwigger
+¿De qué trata este laboratorio?
+El laboratorio "File path traversal, simple case" está diseñado para enseñar una vulnerabilidad muy común y peligrosa llamada Path Traversal (también conocida como Directory Traversal).
+En términos simples: el Path Traversal ocurre cuando una aplicación web permite a un atacante leer archivos que no deberían ser accesibles. Por ejemplo, archivos sensibles del sistema operativo o secretos de la aplicación. En este laboratorio, tu objetivo es leer el archivo /etc/passwd del servidor. Este archivo contiene información de todos los usuarios del sistema Linux.
+El laboratorio simula una tienda online sencilla. Las imágenes de los productos se cargan dinámicamente mediante un parámetro en la URL, como:
+
+https://tu-laboratorio.net/image?filename=10.jpg
+
+El problema es que la aplicación no verifica si filename realmente apunta a un archivo de imagen. Si cambias el valor a algo como ../../../etc/passwd, el servidor obedecerá y te devolverá ese archivo del sistema.
+
+Solución paso a paso 
+Qué necesitarás
+Burp Suite Community Edition
+
+Un navegador web con la extensión FoxyProxy
+
+El enlace del laboratorio – PortSwigger te proporciona una URL única cuando inicias el laboratorio.
+
+Paso 1 – Entender la petición
+Accede al laboratorio – haz clic en el enlace del laboratorio en tu navegador. Asegúrate de que Burp esté ejecutándose y tu navegador esté enviando el tráfico a través de Burp.
+Intercepta una petición – haz clic en cualquier producto, por ejemplo una chaqueta, para ver su página de detalles. Busca la imagen del producto. Haz clic derecho sobre la imagen y selecciona "Abrir imagen en una pestaña nueva".
+Observa la URL de esa nueva pestaña. Tendrá un aspecto similar a:
+https://tu-laboratorio.net/image?filename=42.jpg
+
+Esto significa:
+
+El endpoint /image espera un parámetro llamado filename.
+El valor de ese parámetro es el nombre del archivo de imagen.
+El servidor lee ese archivo desde una carpeta (probablemente /var/www/images/) y te lo envía.
+
+Paso 2 – Enviar la petición a Burp Repeater
+En Burp Suite, ve a la pestaña "Proxy" y luego a la sub-pestaña "HTTP history".
+
+Busca la petición que obtiene la imagen. Será una entrada GET /image?filename=42.jpg.
+Haz clic derecho sobre ella y selecciona "Send to Repeater".
+¿Qué es Repeater? Es una herramienta dentro de Burp que te permite modificar manualmente una petición y enviarla repetidamente al servidor. Es perfecta para probar cosas como path traversal.
+
+Paso 3 – Modificar el nombre del archivo (el ataque)
+En Burp, ve a la pestaña "Repeater".
+
+Verás la petición que acabas de enviar:
+
+
+GET /image?filename=42.jpg HTTP/1.1
+Host: tu-laboratorio.net
+...
+Cambia el valor de filename por:
+
+
+../../../etc/passwd
+La petición quedará así:
+
+
+GET /image?filename=../../../etc/passwd HTTP/1.1
+...
+Haz clic en el botón "Send" en la parte superior de la ventana Repeater.
+
+Paso 4 – Observar el resultado
+Mira la sección "Response". En la mayoría de los casos, verás un texto similar a:
+
+
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+...
+carlos:x:1000:1000:Carlos,,,:/home/carlos:/bin/bash
+¡Felicidades! Has obtenido exitosamente el archivo /etc/passwd. El laboratorio se marcará automáticamente como resuelto.
+
+¿Por qué funciona?
+Analicemos el payload:
+
+../../../etc/passwd
+.. significa "subir un nivel de directorio".
+/ separa nombres de directorios (en sistemas Linux/Unix).
+etc/passwd es la ruta completa al archivo de contraseñas en un sistema Linux típico.
+El servidor espera que tu parámetro filename apunte a algo dentro de /var/www/images/. Al añadir ../, le estás diciendo al servidor:
+Sube de /var/www/images/ a /var/www/ (primer ..)
+Sube otra vez a /var/ (segundo ..)
+Sube otra vez a / (tercer ..)
+Ahora desde la raíz, ve a etc/passwd
+
+El servidor ejecuta eso exactamente porque no hay ninguna verificación de que el archivo deba ser una imagen. El resultado: lees /etc/passwd.
+
+Hallazgos--
+Hallazgo 1: Vulnerabilidad de Path Traversal
+El endpoint /image no valida ni sanitiza el parámetro filename.
+
+Hallazgo 2: Sin restricción de tipo de archivo
+La aplicación lee cualquier archivo al que tenga acceso el proceso del servidor, no solo imágenes.
+
+Hallazgo 3: Sistema de archivos Linux expuesto
+La presencia de /etc/passwd en la respuesta confirma que el servidor es un sistema Linux/Unix y que el ataque ha tenido éxito.
+
+Hallazgo 4: Impacto
+Con path traversal, un atacante podría leer archivos sensibles como archivos de configuración de la aplicación, código fuente u otros archivos del sistema.
+
+Cómo prevenir esto en aplicaciones reales
+Si eres desarrollador, así es como se detienen los ataques de path traversal:
+
+Usa una lista blanca de archivos permitidos. En lugar de aceptar cualquier nombre de archivo, asigna un identificador amigable para el usuario (por ejemplo img42) a un archivo concreto en el disco. Si el identificador no está en la lista, rechaza la petición.
+Sanitiza la entrada del usuario. Elimina o rechaza cualquier secuencia .., /, \ u otras secuencias de traversal de directorios.
+Usa una API segura que no permita path traversal. Por ejemplo, en Java, usa getResource en lugar de construir rutas de archivo directamente. En Python, usa os.path.abspath para comprobar que la ruta final sigue estando dentro del directorio deseado.
+Ejecuta la aplicación con los privilegios mínimos. Si el servidor web se ejecuta como un usuario con pocos privilegios, incluso un path traversal exitoso puede no exponer archivos críticos del sistema.
+No confíes en las comprobaciones del lado del cliente. Nunca asumas que el usuario enviará solo nombres de archivo válidos. Toda la validación debe hacerse en el servidor.
+
+Conclusiones clave
+El path traversal es una de las vulnerabilidades más simples pero más peligrosas. Unos pocos ../ pueden convertir un visor de imágenes inofensivo en un arma de divulgación de archivos.
+Inspecciona siempre cómo se usan los parámetros. Si ves un parámetro de nombre de archivo, prueba con secuencias de traversal.
+La columna Length o Status en Burp Intruder no siempre es necesaria. A veces la prueba más efectiva es simplemente cambiar un valor y enviarlo con Repeater.
+La práctica es esencial. Este laboratorio es el comienzo de toda una serie sobre path traversal (secuencias bloqueadas, evasiones con codificación URL, bypass con byte nulo, etc.).
+
+¡Felicidades! Has completado File path traversal, simple case de PortSwigger.
