@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pentest Report | Trace Null - OWASP Juice Shop (EN/ES)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #f6f8fa;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            line-height: 1.5;
+            color: #1f2328;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            border: 1px solid #d0d7de;
+        }
+
+        .header {
+            background: #0d2b3e;
+            padding: 2rem;
+            color: white;
+            border-bottom: 3px solid #f5a623;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            opacity: 0.85;
+            font-size: 1rem;
+        }
+
+        .company-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+            background: rgba(255,255,255,0.08);
+            padding: 0.8rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+        }
+
+        .lang-section {
+            padding: 2rem;
+            border-bottom: 1px solid #eaeef2;
+        }
+
+        .lang-section:last-child {
+            border-bottom: none;
+        }
+
+        .lang-badge {
+            display: inline-block;
+            background: #f5a623;
+            color: #0d2b3e;
+            padding: 0.2rem 1rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            margin: 1.5rem 0 1rem 0;
+            padding-bottom: 0.3rem;
+            border-bottom: 2px solid #eaeef2;
+            color: #0d2b3e;
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            margin: 1.2rem 0 0.5rem;
+            color: #1f2328;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.7rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-high { background: #d73a4a; color: white; }
+        .badge-medium { background: #e36209; color: white; }
+        .badge-low { background: #2c6e2c; color: white; }
+        .badge-info { background: #0969da; color: white; }
+
+        .vuln-block {
+            background: #f6f8fa;
+            border-left: 4px solid #f5a623;
+            padding: 1.2rem 1.5rem;
+            margin: 1.8rem 0;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+
+        .vuln-title {
+            font-size: 1.35rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.8rem;
+        }
+
+        .meta {
+            font-size: 0.85rem;
+            color: #57606a;
+            margin-bottom: 1rem;
+        }
+
+        .code-block {
+            background: #1f2328;
+            color: #e6edf3;
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            font-family: 'SF Mono', 'Courier New', monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .screenshot-placeholder {
+            background: #eef2f5;
+            border: 1px dashed #8c959f;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: center;
+            color: #2c3e4e;
+            font-size: 0.9rem;
+        }
+
+        .screenshot-placeholder i {
+            font-style: normal;
+            font-weight: 600;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.85rem;
+        }
+
+        th, td {
+            border: 1px solid #d0d7de;
+            padding: 0.6rem 0.8rem;
+            text-align: left;
+        }
+
+        th {
+            background: #f1f3f5;
+        }
+
+        .footer {
+            background: #f6f8fa;
+            border-top: 1px solid #d0d7de;
+            padding: 1.2rem;
+            text-align: center;
+            font-size: 0.75rem;
+            color: #57606a;
+        }
+
+        @media (max-width: 768px) {
+            .lang-section {
+                padding: 1rem;
+            }
+            .vuln-block {
+                padding: 1rem;
+            }
+            .header h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Penetration Test Report / Informe de Pruebas de Penetración</h1>
+        <p>OWASP Juice Shop – Security Assessment (Educational) / Evaluación de Seguridad (Educativo)</p>
+        <div class="company-details">
+            <span><strong>Company / Empresa:</strong> Trace Null</span>
+            <span><strong>Pentester:</strong> Rene Torres</span>
+            <span><strong>Date / Fecha:</strong> June 14, 2026</span>
+            <span><strong>Target / Objetivo:</strong> https://juice-shop.herokuapp.com</span>
+        </div>
+    </div>
+
+    <!-- ENGLISH SECTION -->
+    <div class="lang-section">
+        <div class="lang-badge">ENGLISH</div>
+
+        <h2>Executive Summary</h2>
+        <p>This report documents the findings of a manual penetration test against OWASP Juice Shop, a deliberately vulnerable web application used for security training. Five distinct vulnerabilities were identified and exploited, ranging from SQL injection to information exposure. The objective was to simulate real‑world attack techniques and provide actionable remediation advice. All findings have been reproduced and validated.</p>
+
+        <h2>Scope & Methodology</h2>
+        <ul>
+            <li><strong>Application:</strong> OWASP Juice Shop (Heroku deployment)</li>
+            <li><strong>Approach:</strong> Black‑box manual testing</li>
+            <li><strong>Techniques:</strong> SQLi, XSS, IDOR, forced browsing, error analysis</li>
+        </ul>
+
+        <h2>Summary of Findings</h2>
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Vulnerability</th><th>Severity</th><th>Endpoint</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>TRACE-01</td><td>SQL Injection (Auth Bypass)</td><td><span class="badge badge-high">HIGH</span></td><td>Login form</td></tr>
+                <tr><td>TRACE-02</td><td>Reflected / DOM XSS</td><td><span class="badge badge-medium">MEDIUM</span></td><td>Search bar</td></tr>
+                <tr><td>TRACE-03</td><td>IDOR – Confidential Document</td><td><span class="badge badge-medium">MEDIUM</span></td><td>/ftp directory</td></tr>
+                <tr><td>TRACE-04</td><td>Sensitive Information Exposure</td><td><span class="badge badge-low">LOW/MED</span></td><td>/metrics endpoint</td></tr>
+                <tr><td>TRACE-05</td><td>Poor Error Handling</td><td><span class="badge badge-info">INFO</span></td><td>Login error trigger</td></tr>
+            </tbody>
+        </table>
+
+        <!-- Vuln 1 EN -->
+        <div class="vuln-block">
+            <div class="vuln-title">
+                <span>🔓 TRACE-01: SQL Injection – Authentication Bypass</span>
+                <span class="badge badge-high">HIGH</span>
+            </div>
+            <div class="meta">Location: Login page (email parameter)</div>
+            <p><strong>Description</strong><br>The login endpoint is vulnerable to union-based SQL injection. By injecting a crafted payload into the email field, an attacker can force the SQL query to return a valid password from the <code>admins</code> table, completely bypassing password verification.</p>
+            <p><strong>Steps to reproduce</strong></p>
+            <ol>
+                <li>Go to login page <code>/#/login</code></li>
+                <li>In the <strong>Email</strong> field, input:</li>
+                <div class="code-block">' UNION SELECT 'pass' AS password FROM admins WHERE '1' = '1</div>
+                <li>In the <strong>Password</strong> field, enter anything (e.g., "dummy")</li>
+                <li>Click "Log in"</li>
+            </ol>
+            <p><strong>Result</strong><br>Successful authentication as administrator. The challenge "Privacy Policy" is marked as solved, and the attacker gains full access to the application.</p>
+            <div class="screenshot-placeholder">
+                📸 <strong>Evidence:</strong> <i>image1.png</i> – Main shop page after SQLi login, showing solved challenge and authenticated session.
+            </div>
+            <p><strong>Impact</strong><br>Complete account takeover, privilege escalation, and potential data breach.</p>
+            <p><strong>Remediation</strong><br>Use parameterized queries (prepared statements) or an ORM. Never concatenate user input directly into SQL. Implement allow-list input validation.</p>
+        </div>
+
+        <!-- Vuln 2 EN -->
+        <div class="vuln-block">
+            <div class="vuln-title">
+                <span>⚠️ TRACE-02: Cross-Site Scripting (XSS) – Reflected & DOM</span>
+                <span class="badge badge-medium">MEDIUM</span>
+            </div>
+            <div class="meta">Location: Search bar</div>
+            <p><strong>Description</strong><br>The search functionality does not sanitize user-supplied input, allowing injection of arbitrary HTML/JavaScript. Two payloads were tested: a classic <code>&lt;iframe&gt;</code> with <code>javascript:alert()</code> and a more complex SoundCloud embed that solved the "Bonus Payload" DOM XSS challenge.</p>
+            <p><strong>Payload 1 (Reflected XSS)</strong></p>
+            <div class="code-block">&lt;iframe src="javascript:alert('XSS')"&gt;</div>
+            <p><strong>Payload 2 (DOM XSS / bonus)</strong></p>
+            <div class="code-block">&lt;iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/771984076&color=%23ff5000&auto_play=true&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true&~&lt;/iframe&gt;</div>
+            <p><strong>Result</strong><br>JavaScript alert is triggered, and the application solves the "Bonus Payload" challenge, confirming XSS exploitation.</p>
+            <div class="screenshot-placeholder">
+                📸 <strong>Evidence:</strong> <i>image2.png</i> (alert execution) and <i>image3.png</i> (bonus payload solved).
+            </div>
+            <p><strong>Impact</strong><br>Session hijacking, phishing, defacement, or arbitrary actions performed in the context of the victim user.</p>
+            <p><strong>Remediation</strong><br>Apply context-aware output encoding (HTML entity encoding). Use Content Security Policy (CSP) to block inline script execution. Sanitize with libraries like DOMPurify.</p>
+        </div>
+
+        <!-- Vuln 3 EN -->
+        <div class="vuln-block">
+            <div class="vuln-title">
+                <span>📁 TRACE-03: IDOR – Insecure Direct Object Reference</span>
+                <span class="badge badge-medium">MEDIUM</span>
+            </div>
+            <div class="meta">Location: FTP directory traversal via About Us page</div>
+            <p><strong>Description</strong><br>By manually changing the URL from the About Us page, an attacker can navigate to the server's <code>/ftp</code> directory and access a confidential business document without any authentication or authorization checks.</p>
+            <p><strong>Steps to reproduce</strong></p>
+            <ol>
+                <li>Open the About Us page: <code>/#/about</code></li>
+                <li>Modify the URL to <code>https://juice-shop.herokuapp.com/ftp</code></li>
+                <li>Locate the file <code>acquisitions.md</code> (or similar)</li>
+                <li>Open the file directly – content is disclosed</li>
+            </ol>
+            <p><strong>Result</strong><br>Full text of "Planned Acquisitions" is displayed, marked as confidential.</p>
+            <div class="screenshot-placeholder">
+                📸 <strong>Evidence:</strong> <i>image4.png</i> – Shows the acquisitions document with confidentiality notice.
+            </div>
+            <p><strong>Impact</strong><br>Leakage of internal strategic plans, which could be used for competitive or financial gain.</p>
+            <p><strong>Remediation</strong><br>Implement proper access control on every endpoint and static resource. Store sensitive files outside the web root and use a secure download handler with permission checks.</p>
+        </div>
+
+        <!-- Vuln 4 EN -->
+        <div class="vuln-block">
+            <div class="vuln-title">
+                <span>📊 TRACE-04: Sensitive Information Exposure (Metrics Endpoint)</span>
+                <span class="badge badge-low">LOW/MED</span>
+            </div>
+            <div class="meta">Location: <code>/metrics</code></div>
+            <p><strong>Description</strong><br>The application exposes a Prometheus metrics endpoint without any authentication. This endpoint reveals internal operational data that can assist an attacker in fingerprinting and planning further attacks.</p>
+            <p><strong>Steps to reproduce</strong></p>
+            <div class="code-block">curl https://juice-shop.herokuapp.com/metrics</div>
+            <p><strong>Information disclosed includes:</strong></p>
+            <ul>
+                <li>HTTP request counts grouped by status (2XX, 4XX, 5XX)</li>
+                <li>File upload success/error counters</li>
+                <li>Application startup durations (db creation, FTP cleanup, etc.)</li>
+                <li>Process CPU, memory, and start time</li>
+            </ul>
+            <div class="screenshot-placeholder">
+                📸 <strong>Evidence:</strong> <i>image5.png</i> – Snippet of the metrics output in Prometheus format.
+            </div>
+            <p><strong>Impact</strong><br>Attackers can infer usage patterns, system resources, and internal component details, increasing the likelihood of a successful targeted attack.</p>
+            <p><strong>Remediation</strong><br>Restrict access to <code>/metrics</code> to trusted internal networks using firewall rules or reverse proxy authentication. Enable basic auth or API key for monitoring endpoints in production.</p>
+        </div>
+
+        <!-- Vuln 5 EN -->
+        <div class="vuln-block">
+            <div class="vuln-title">
+                <span>⚠️ TRACE-05: Poor Error Handling</span>
+                <span class="badge badge-info">INFORMATIVE</span>
+            </div>
+            <div class="meta">Location: Login form (malformed input)</div>
+            <p><strong>Description</strong><br>When the application receives unexpected input (e.g., malformed SQL in the email field), it fails to handle the error gracefully. Instead of a custom error page, the server returns a generic Heroku error iframe, revealing that an unhandled exception occurred.</p>
+            <p><strong>Steps to reproduce</strong></p>
+            <ol>
+                <li>Go to login page</li>
+                <li>In the Email field, enter:</li>
+                <div class="code-block">UNION SELECT null—</div>
+                <li>Enter any password and submit</li>
+            </ol>
+            <p><strong>Result</strong><br>The page shows an embedded Heroku error frame and the raw injected payload appears on screen. The challenge "Error Handling" is solved.</p>
+            <div class="screenshot-placeholder">
+                📸 <strong>Evidence:</strong> <i>image6.png</i> – Error page with payload visible and solved challenge.
+            </div>
+            <p><strong>Impact</strong><br>Information disclosure (database presence, platform details) and poor user experience. May aid attackers in refining injection attacks.</p>
+            <p><strong>Remediation</strong><br>Implement a global exception handler that returns sanitized, user‑friendly messages. Log full errors server‑side only. Avoid exposing any system details to clients.</p>
+        </div>
+
+        <h2>Remediation Roadmap (Priority Order)</h2>
+        <ol>
+            <li><strong>Immediate (Critical):</strong> Fix SQL injection using parameterized queries – prevents authentication bypass and data leakage.</li>
+            <li><strong>High:</strong> Implement access controls for <code>/ftp</code> and all static directories (IDOR protection).</li>
+            <li><strong>Medium:</strong> Apply output encoding / CSP to eliminate XSS in search and other input vectors.</li>
+            <li><strong>Low/Defense in depth:</strong> Protect <code>/metrics</code> with authentication or IP whitelist.</li>
+            <li><strong>Informational:</strong> Replace generic error pages with custom safe error handlers.</li>
+        </ol>
+
+        <h2>Conclusion</h2>
+        <p>The OWASP Juice Shop application, while designed as a training target, contains real vulnerabilities that are prevalent in many production systems. The identified issues – especially SQL injection and IDOR – pose serious risks if present in live environments. Applying the recommended countermeasures will drastically reduce the attack surface and align with secure coding best practices.</p>
+        <p>This report is intended for educational use and GitHub portfolio demonstration. All tests were performed responsibly in an isolated training environment.</p>
+    </div>
+
+    <!-- SPANISH SECTION -->
+    <div class="lang-section">
+        <div class="lang-badge">ESPAÑOL</div>
+
+        <h2>Resumen Ejecutivo</h2>
+        <p>Este informe documenta los hallazgos de una prueba de penetración manual contra OWASP Juice Shop, una aplicación web deliberadamente vulnerable utilizada para capacitación en seguridad. Se identificaron y explotaron cinco vulnerabilidades distintas, que van desde inyección SQL hasta exposición de información. El objetivo fue simular técnicas de ataque reales y proporcionar recomendaciones de remediación prácticas. Todos los hallazgos han sido reproducidos y validados.</p>
+
+        <h2>Alcance y Metodología</h2>
+        <ul>
+            <li><strong>Aplicación:</strong> OWASP Juice Shop (despliegue en Heroku)</li>
+            <li><strong>Enfoque:</strong> Pruebas manuales de caja negra</li>
+            <li><strong>Técnicas:</strong> SQLi, XSS, IDOR, navegación forzada, análisis de errores</li>
+        </ul>
+
+        <h2>Resumen de Hallazgos</h2>
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Vulnerabilidad</th><th>Severidad</th><th>Endpoint</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>TRACE-01</td><td>Inyección SQL (Bypass de autenticación)</td><td><span class="badge badge-high">ALTA</span></td><td>Formulario de login</td></tr>
+                <tr><td>TRACE-02</td><td>XSS Reflejado / DOM</td><td><span class="badge badge-medium">MEDIA</span></td><td>Barra de búsqueda</td></tr>
+                <tr><td>TRACE-03</td><td>IDOR – Documento confidencial</td><td><span class="badge badge-medium">MEDIA</span></td><td>Directorio /ftp</td></tr>
+                <tr><td>TRACE-04</td><td>Exposición de información sensible</td><td><span class="badge badge-low">BAJA/MEDIA</span></td><td>Endpoint /metrics</td></tr>
+                <tr><td>TRACE-05</td><td>Manejo deficiente de errores</td><td><span class="badge badge-info">INFORMATIVA</span></td><td>Disparador de error en login</td></tr>
+            </tbody>
+        </table>
+
+        <!-- Vuln 1 ES -->
+        <div class="vuln-block">
+            <div class="vuln-title">
+                <span>🔓 TRACE-01: Inyección SQL – Bypass de Autenticación</span>
+                <span class="badge badge-high">ALTA</span>
+            </div>
+            <div class="meta">Ubicación: Página de login (campo email)</div>
+            <p><strong>Descripción</strong><br>El endpoint de login es vulnerable a inyección SQL basada en UNION. Al inyectar un payload manipulado en el campo de correo electrónico, un atacante puede forzar la consulta SQL para que devuelva una contraseña válida de la tabla <code>admins</code>, omitiendo por completo la verificación de contraseña.</p>
+            <p><strong>Pasos para reproducir</strong></p>
+            <ol>
+                <li>Ir a la página de login <code>/#/login</code></li>
+                <li>En el campo <strong>Email</strong>, ingresar:</li>
+                <div class="code-block">' UNION SELECT 'pass' AS password FROM admins WHERE '1' = '1</div>
+                <li>En el campo <strong>Contraseña</strong>, ingresar cualquier cosa (ej. "dummy")</li>
+                <li>Hacer clic en "Log in"</li>
+            </ol>
+            <p><strong>Resultado</strong><br>Autenticación exitosa como administrador. El desafío "Privacy Policy" se marca como resuelto y el atacante obtiene acceso completo a la aplicación.</p>
+            <div class="screenshot-placeholder">
+                📸 <strong>Evidencia:</strong> <i>image1.png</i> – Página principal después del login por SQLi, mostrando el desafío resuelto y sesión autenticada.
+            </div>
+            <p><strong>Impacto</strong><br>Toma de control total de la cuenta, escalada de privilegios y posible filtración de datos.</p>
+            <p><strong>Remediación</strong><br>Usar consultas parametrizadas (prepared statements) o un ORM. Nunca concatenar entrada del usuario directamente en SQL. Implementar validación de entrada por lista blanca.</p>
+        </div>
+
+        <!-- Vuln 2 ES -->
+        <div class="vuln-block">
+            <div class="vuln-title">
+                <span>⚠️ TRACE-02: Cross-Site Scripting (XSS) – Reflejado y DOM</span>
+                <span class="badge badge-medium">MEDIA</span>
+            </div>
+            <div class="meta">Ubicación: Barra de búsqueda</div>
+            <p><strong>Descripción</strong><br>La funcionalidad de búsqueda no sanitiza la entrada del usuario, permitiendo la inyección de HTML/JavaScript arbitrario. Se probaron dos payloads: un <code>&lt;iframe&gt;</code> clásico con <code>javascript:alert()</code> y un embed más complejo de SoundCloud que resolvió el desafío "Bonus Payload" de XSS DOM.</p>
+            <p><strong>Payload 1 (XSS reflejado)</strong></p>
+            <div class="code-block">&lt;iframe src="javascript:alert('XSS')"&gt;</div>
+            <p><strong>Payload 2 (XSS DOM / bonus)</strong></p>
+            <div class="code-block">&lt;iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/771984076&color=%23ff5000&auto_play=true&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true&~&lt;/iframe&gt;</div>
+            <p><strong>Resultado</strong><br>Se activa una alerta de JavaScript y la aplicación resuelve el desafío "Bonus Payload", confirmando la explotación del XSS.</p>
+            <div class="screenshot-placeholder">
+                📸 <strong>Evidencia:</strong> <i>image2.png</i> (ejecución de la alerta) e <i>image3.png</i> (payload bonus resuelto).
+            </div>
+            <p><strong>Impacto</strong><br>Secuestro de sesión, phishing, defacement o acciones arbitrarias realizadas en el contexto del usuario víctima.</p>
+            <p><strong>Remediación</strong><br>Aplicar codificación de salida según el contexto (entidades HTML). Usar Content Security Policy (CSP) para bloquear la ejecución de scripts inline. Sanitizar con bibliotecas como DOMPurify.</p>
+        </div>
+
+        <!-- Vuln 3 ES -->
+        <div class="vuln-block">
+            <div class="vuln-title">
+                <span>📁 TRACE-03: IDOR – Referencia Directa a Objeto No Segura</span>
+                <span class="badge badge-medium">MEDIA</span>
+            </div>
+            <div class="meta">Ubicación: Directorio FTP mediante About Us</div>
+            <p><strong>Descripción</strong><br>Modificando manualmente la URL desde la página "About Us", un atacante puede navegar al directorio <code>/ftp</code> del servidor y acceder a un documento comercial confidencial sin ninguna verificación de autenticación o autorización.</p>
+            <p><strong>Pasos para reproducir</strong></p>
+            <ol>
+                <li>Abrir la página "About Us": <code>/#/about</code></li>
+                <li>Modificar la URL a <code>https://juice-shop.herokuapp.com/ftp</code></li>
+                <li>Localizar el archivo <code>acquisitions.md</code> (o similar)</li>
+                <li>Abrir el archivo directamente – se revela su contenido</li>
+            </ol>
+            <p><strong>Resultado</strong><br>Se muestra el texto completo de "Planned Acquisitions", marcado como confidencial.</p>
+            <div class="screenshot-placeholder">
+                📸 <strong>Evidencia:</strong> <i>image4.png</i> – Muestra el documento de adquisiciones con aviso de confidencialidad.
+            </div>
+            <p><strong>Impacto</strong><br>Filtración de planes estratégicos internos, que podrían usarse para obtener ventajas competitivas o financieras.</p>
+            <p><strong>Remediación</strong><br>Implementar controles de acceso adecuados en cada endpoint y recurso estático. Almacenar archivos sensibles fuera de la raíz web y usar un controlador de descarga seguro con verificaciones de permisos.</p>
+        </div>
+
+        <!-- Vuln 4 ES -->
+        <div class="vuln-block">
+            <div class="vuln-title">
+                <span>📊 TRACE-04: Exposición de Información Sensible (Endpoint de métricas)</span>
+                <span class="badge badge-low">BAJA/MEDIA</span>
+            </div>
+            <div class="meta">Ubicación: <code>/metrics</code></div>
+            <p><strong>Descripción</strong><br>La aplicación expone un endpoint de métricas en formato Prometheus sin ninguna autenticación. Este endpoint revela datos operativos internos que pueden ayudar a un atacante a obtener información y planificar ataques posteriores.</p>
+            <p><strong>Pasos para reproducir</strong></p>
+            <div class="code-block">curl https://juice-shop.herokuapp.com/metrics</div>
+            <p><strong>La información divulgada incluye:</strong></p>
+            <ul>
+                <li>Conteo de peticiones HTTP agrupadas por código de estado (2XX, 4XX, 5XX)</li>
+                <li>Contadores de éxito/error en subidas de archivos</li>
+                <li>Duración de tareas de inicio de la aplicación (creación de BD, limpieza FTP, etc.)</li>
+                <li>Uso de CPU, memoria y hora de inicio del proceso</li>
+            </ul>
+            <div class="screenshot-placeholder">
+                📸 <strong>Evidencia:</strong> <i>image5.png</i> – Fragmento de la salida de métricas en formato Prometheus.
+            </div>
+            <p><strong>Impacto</strong><br>Los atacantes pueden inferir patrones de uso, recursos del sistema y detalles de componentes internos, aumentando la probabilidad de un ataque dirigido exitoso.</p>
+            <p><strong>Remediación</strong><br>Restringir el acceso a <code>/metrics</code> a redes internas confiables mediante reglas de firewall o autenticación con proxy inverso. Habilitar autenticación básica o API key para endpoints de monitoreo en producción.</p>
+        </div>
+
+        <!-- Vuln 5 ES -->
+        <div class="vuln-block">
+            <div class="vuln-title">
+                <span>⚠️ TRACE-05: Manejo Deficiente de Errores</span>
+                <span class="badge badge-info">INFORMATIVA</span>
+            </div>
+            <div class="meta">Ubicación: Formulario de login (entrada malformada)</div>
+            <p><strong>Descripción</strong><br>Cuando la aplicación recibe una entrada inesperada (por ejemplo, SQL malformado en el campo de email), no maneja el error correctamente. En lugar de una página de error personalizada, el servidor devuelve un iframe genérico de Heroku, revelando que ocurrió una excepción no controlada.</p>
+            <p><strong>Pasos para reproducir</strong></p>
+            <ol>
+                <li>Ir a la página de login</li>
+                <li>En el campo Email, ingresar:</li>
+                <div class="code-block">UNION SELECT null—</div>
+                <li>Ingresar cualquier contraseña y enviar</li>
+            </ol>
+            <p><strong>Resultado</strong><br>La página muestra un frame de error de Heroku y el payload inyectado aparece en pantalla. Se resuelve el desafío "Error Handling".</p>
+            <div class="screenshot-placeholder">
+                📸 <strong>Evidencia:</strong> <i>image6.png</i> – Página de error con el payload visible y desafío resuelto.
+            </div>
+            <p><strong>Impacto</strong><br>Divulgación de información (presencia de base de datos, detalles de la plataforma) y mala experiencia de usuario. Puede ayudar a atacantes a refinar ataques de inyección.</p>
+            <p><strong>Remediación</strong><br>Implementar un manejador global de excepciones que devuelva mensajes sanitizados y amigables para el usuario. Registrar errores completos solo del lado del servidor. Evitar exponer cualquier detalle del sistema al cliente.</p>
+        </div>
+
+        <h2>Hoja de Ruta de Remediación (Orden de Prioridad)</h2>
+        <ol>
+            <li><strong>Inmediato (Crítico):</strong> Corregir la inyección SQL usando consultas parametrizadas – previene el bypass de autenticación y fuga de datos.</li>
+            <li><strong>Alta:</strong> Implementar controles de acceso para <code>/ftp</code> y todos los directorios estáticos (protección IDOR).</li>
+            <li><strong>Media:</strong> Aplicar codificación de salida / CSP para eliminar XSS en la búsqueda y otros vectores de entrada.</li>
+            <li><strong>Baja/Defensa en profundidad:</strong> Proteger <code>/metrics</code> con autenticación o lista blanca de IPs.</li>
+            <li><strong>Informativa:</strong> Reemplazar páginas de error genéricas con manejadores personalizados seguros.</li>
+        </ol>
+
+        <h2>Conclusión</h2>
+        <p>La aplicación OWASP Juice Shop, aunque diseñada como un objetivo de entrenamiento, contiene vulnerabilidades reales que son prevalentes en muchos sistemas productivos. Los problemas identificados – especialmente la inyección SQL y el IDOR – representan riesgos graves si están presentes en entornos en vivo. Aplicar las contramedidas recomendadas reducirá drásticamente la superficie de ataque y se alineará con las mejores prácticas de codificación segura.</p>
+        <p>Este informe tiene fines educativos y de demostración para el portafolio de GitHub. Todas las pruebas se realizaron de manera responsable en un entorno de entrenamiento aislado.</p>
+    </div>
+
+    <div class="footer">
+        Trace Null – División de Pruebas de Penetración | Prueba realizada por Rene Torres<br>
+        Report generated on June 14, 2026 / Informe generado el 14 de junio de 2026 — For educational release / Para divulgación educativa.
+    </div>
+</div>
+</body>
+</html>
